@@ -1,0 +1,9 @@
+whisper greetlib — a small library (imported by useslibrary.morph).
+
+sovereign twice(x) {
+    signal x * 2
+}
+
+sovereign shout(s) {
+    signal upper(s) ++ "!"
+}

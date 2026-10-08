@@ -1,0 +1,8 @@
+whisper useslibrary — imports greetlib.morph and uses its functions.
+
+import "greetlib.morph"
+
+sovereign main() {
+    print(twice(21))        # 42
+    print(shout("hi"))      # HI!
+}

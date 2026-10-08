@@ -25,6 +25,10 @@ const edge = {
   'bool-eq': `sovereign main(){ print(true) print(false) print(1 == 1) print(1 != 2) print(2 > 1) print(not true) print(true and false) print(true or false) }`,
   'division': `sovereign main(){ print(1/3) print(2/3*3) print(10 % 3) print(-7 % 3) print(2 ** 10) }`,
   'recurse': `sovereign fib(n){ when n < 2 { signal n } signal fib(n-1)+fib(n-2) } sovereign main(){ print(fib(15)) }`,
+  'heal-basic': `sovereign main(){ heal { print(1/0) print("x") } dream { print("caught") } print("after") }`,
+  'heal-ok': `sovereign main(){ heal { print("fine") } dream { print("no") } print("after") }`,
+  'heal-nested': `sovereign boom(){ signal 1/0 } sovereign main(){ heal { boom() } dream { print("recovered") } }`,
+  'heal-value': `sovereign safeDiv(a,b){ heal { signal a/b } dream { signal 0-1 } } sovereign main(){ print(safeDiv(6,2)) print(safeDiv(6,0)) }`,
   'typed-scalar': `sovereign f(n: int) -> int { when n < 2 { signal n } signal f(n-1)+f(n-2) } sovereign main(){ print(f(12)) }`,
   'typed-fallback': `sovereign s(x: int) -> int { let a=[1,2,3] signal x+len(a) } sovereign main(){ print(s(10)) print(s(0)) }`,
   'forin-kv-map': `sovereign main(){ let m={"b":2,"a":1,"c":3} for k,v in m { print(k) print(v) } }`,
@@ -77,9 +81,7 @@ let pass = 0, fail = 0;
 
 // success parity: both succeed AND identical stdout.
 // error parity: both FAIL (non-zero exit), regardless of message text.
-function check(name, src, args = []) {
-  const f = path.join(tmp, name.replace(/[^\w.-]/g, '_') + '.morph');
-  fs.writeFileSync(f, src);
+function checkMain(name, f, args = []) {
   const exe = f.replace(/\.morph$/, '.exe');
   const b = build(f, exe);
   if (!fs.existsSync(exe)) { console.log('BUILD FAIL ' + name); console.log(b.stdout + b.stderr); fail++; return; }
@@ -93,8 +95,19 @@ function check(name, src, args = []) {
   if (norm(i.out) === norm(n.out)) { console.log('OK    ' + name); pass++; }
   else { console.log('DIFF  ' + name); console.log('  interp: ' + JSON.stringify(norm(i.out))); console.log('  native: ' + JSON.stringify(norm(n.out))); fail++; }
 }
+function check(name, src, args = []) {
+  const f = path.join(tmp, name.replace(/[^\w.-]/g, '_') + '.morph');
+  fs.writeFileSync(f, src);
+  checkMain(name, f, args);
+}
 
 for (const [name, src] of Object.entries(edge)) check(name, src);
+
+// --- multi-file module parity (incl. an import cycle that must not hang) ---
+fs.writeFileSync(path.join(tmp, '_liba.morph'), 'import "_libb.morph"\nsovereign fa(x){ signal x + fb(1) }\n');
+fs.writeFileSync(path.join(tmp, '_libb.morph'), 'import "_liba.morph"\nsovereign fb(x){ signal x + 1 }\n');
+fs.writeFileSync(path.join(tmp, '_cyc.morph'), 'import "_liba.morph"\nsovereign main(){ print(fa(10)) print(fb(4)) }\n');
+checkMain('module-cycle', path.join(tmp, '_cyc.morph'));
 
 // fuzz: N random programs, each printing a batch of random expressions
 const rng = mulberry32(1234);

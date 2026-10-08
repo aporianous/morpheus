@@ -205,6 +205,20 @@ backends agree on *whether* an operation errors; the message text is
 implementation-defined. Free (undeclared) names are a runtime error in the
 interpreter and a compile-time error in the native backend.
 
+## Errors
+```
+heal { print(1 / 0) print("unreached") }
+dream { print("caught") }              # runs on any runtime error
+```
+An uncaught error prints `Error: <message>` and exits non-zero.
+
+## Modules
+`import "file.morph"` loads another file. Modules are currently **flat**: the
+imported file's functions and top-level `let`s join the same global scope (there
+are no namespaces yet), and each file is loaded **once** — a cycle (A imports B
+imports A) is resolved by loading each file a single time, never by hanging.
+Paths are relative to the importing file.
+
 ## Grammar (informal)
 ```
 program   := (import | extern | funct | stmt)*
