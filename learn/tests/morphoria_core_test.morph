@@ -19,5 +19,11 @@ sovereign main() {
     assert(stars_of([0.7, 0.65]) == 2, "2 stars")
     assert(stars_of([0.5]) == 1, "1 star")
     assert(stars_of([0.3]) == 0, "0 stars")
+    let r = pick_review(["a", "b", "c"], ["d"], ["e"])
+    assert(len(r) == 5, "review is 5 questions")
+    assert(contains(r, "a") and contains(r, "d") and contains(r, "e"), "weak+mid+strong present")
+    let r2 = pick_review(["a"], ["b", "c", "d"], ["e"])
+    assert(len(r2) == 5, "fills to 5 when few weak")
+    assert(not (r2[0] == r2[1]), "no duplicate at the top")
     print("core tests passed")
 }

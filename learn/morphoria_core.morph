@@ -42,3 +42,29 @@ sovereign stars_of(xs) {
     when mn >= 0.4 { signal 1 }
     signal 0
 }
+
+sovereign add_unique(out, x) {
+    when contains(out, x) { signal out }
+    signal push(out, x)
+}
+
+sovereign take_into(out, xs, n) {
+    let i = 0
+    loop (i < len(xs)) and (i < n) {
+        let out = add_unique(out, xs[i])
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign pick_review(weak, mid, strong) {
+    let out = []
+    let out = take_into(out, weak, 3)
+    let out = take_into(out, mid, 1)
+    let out = take_into(out, strong, 1)
+    let out = take_into(out, mid, 5)
+    let out = take_into(out, strong, 5)
+    let out = take_into(out, weak, 5)
+    when len(out) > 5 { let out = out[0:5] }
+    signal out
+}
