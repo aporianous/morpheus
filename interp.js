@@ -71,6 +71,7 @@
       if (isKw('signal')) { next(); return { type: 'Return', expr: expression() }; }
       if (isKw('heal')) return healStmt();
       if (isKw('from')) return fromStmt();
+      if (isKw('import')) return importStmt();
       if (isKw('vision')) { next(); next(); return { type: 'Noop' }; }
       if (isKw('morph')) return { type: 'Block', body: block() };
       // assignment vs bare expression
@@ -93,11 +94,12 @@
       return { type: 'Heal', errName, body, alt };
     }
     function fromStmt() { next(); next(); next(); next(); return { type: 'Noop' }; } // `from python import x` -> noop in the browser demo
+    function importStmt() { next(); const tok = peek(); if (tok.type !== 'str') throw new Error('import expects a file path string'); next(); return { type: 'Import', path: tok.value }; }
 
     function expression() { return orE(); }
-    function bin(left, ops, rhs) { let node = left(); while (peek().type === 'op' && ops.includes(peek().value)) { const op = next().value; node = { type: 'Bin', op, l: node, r: rhs() }; } return node; }
-    function orE() { return bin(andE, ['||'], orRHS); }
-    function andE() { return bin(eqE, ['&&'], andRHS); }
+    function bin(left, ops, rhs) { let node = left(); while ((peek().type === 'op' || peek().type === 'kw') && ops.includes(peek().value)) { const op = next().value; node = { type: 'Bin', op, l: node, r: rhs() }; } return node; }
+    function orE() { return bin(andE, ['||', 'or'], orRHS); }
+    function andE() { return bin(eqE, ['&&', 'and'], andRHS); }
     function eqE() { return bin(cmpE, ['==', '!='], eqRHS); }
     function cmpE() { return bin(addE, ['>', '<', '>=', '<='], cmpRHS); }
     function addE() { return bin(mulE, ['+', '-', '++'], addRHS); }
@@ -126,6 +128,7 @@
       if (tok.type === 'kw' && tok.value === 'weave') { next(); return { type: 'Weave', body: block() }; }
       if (tok.type === 'ident') { next(); return { type: 'Ident', name: tok.value }; }
       if (isP('(')) { next(); const e = expression(); eat(')'); return e; }
+      if (isP('[')) { next(); const items = []; while (!isP(']')) { items.push(expression()); if (isOp(',')) next(); } eat(']'); return { type: 'List', items }; }
       throw new Error('line ' + tok.line + ': unexpected token ' + JSON.stringify(tok.value));
     }
     function prophesy() { next();
@@ -151,12 +154,14 @@
   function runMorpheus(src, options) {
     options = options || {};
     const out = [];
-    const env = { vars: Object.create(null), funcs: Object.create(null), out };
+    const env = { vars: Object.create(null), funcs: Object.create(null), out, file: options.basePath || '<main>' };
+    const loaded = new Set();
     const g = Object.assign(builtins(env), options.builtins || {});
 
     function evalExpr(node) {
       switch (node.type) {
         case 'Num': case 'Str': case 'Bool': return node.value;
+        case 'List': return node.items.map(evalExpr);
         case 'Ident': return lookup(node.name);
         case 'Bin': return applyBin(node.op, evalExpr(node.l), evalExpr(node.r));
         case 'Un': { const v = evalExpr(node.e); return node.op === '-' ? -v : !truthy(v); }
@@ -181,7 +186,7 @@
         case '++': return String(a) + String(b);
         case '>': return a > b; case '<': return a < b; case '>=': return a >= b; case '<=': return a <= b;
         case '==': return a === b; case '!=': return a !== b;
-        case '&&': return truthy(a) ? b : a; case '||': return truthy(a) ? a : b;
+        case '&&': case 'and': return truthy(a) ? b : a; case '||': case 'or': return truthy(a) ? a : b;
         default: throw new Error('unknown operator ' + op);
       }
     }
@@ -213,6 +218,18 @@
         case 'Heal': { try { return execBlockValue(s.body); } catch (e) { if (e[RET]) throw e; if (s.alt) return execBlockValue(s.alt); throw e; } }
         case 'Block': return execBlockValue(s.body);
         case 'Noop': return undefined;
+        case 'Import': {
+          const resolve = options.resolve || ((p) => p);
+          const full = resolve(s.path, env.file);
+          if (!loaded.has(full)) {
+            const src2 = (options.modules && (options.modules[full] || options.modules[s.path])) || (options.readFile ? options.readFile(full) : null);
+            if (src2 == null) throw new Error('cannot import "' + s.path + '" (no loader in this environment)');
+            loaded.add(full);
+            const prev = env.file; if (!/^</.test(full)) env.file = full;
+            try { for (const st of parse(src2).body) execStmt(st); } finally { env.file = prev; }
+          }
+          return undefined;
+        }
         default: throw new Error('cannot execute ' + s.type);
       }
     }
@@ -232,6 +249,20 @@
         random_int: (lo, hi) => Math.floor(lo + Math.random() * (hi - lo + 1)),
         prophesy_ci: (m, s, c) => s * (c || 1.96),
         morph_rewrite: () => undefined, morph_constant: () => undefined,
+        read_file: (p) => { if (!options.readFile) throw new Error('read_file: I/O not available in this environment'); return options.readFile(p); },
+        write_file: (p, t) => { if (!options.writeFile) throw new Error('write_file: I/O not available in this environment'); options.writeFile(p, String(t)); return undefined; },
+        argv: () => (options.argv || []).slice(),
+        env: (k) => (options.env ? options.env(k) : undefined),
+        clock: () => Date.now() / 1000,
+        push: (l, v) => { l.push(v); return l; },
+        pop: (l) => l.pop(),
+        unshift: (l, v) => { l.unshift(v); return l; },
+        set: (l, i, v) => { l[i] = v; return l; },
+        remove_at: (l, i) => { l.splice(i, 1); return l; },
+        rand: (l) => l[Math.floor(Math.random() * l.length)],
+        clear: () => { if (options.host && options.host.clear) options.host.clear(); return undefined; },
+        sleep: (ms) => { if (options.host && options.host.sleep) options.host.sleep(ms); return undefined; },
+        key: () => (options.host && options.host.key ? options.host.key() : ''),
       };
       return b;
     }
@@ -241,7 +272,29 @@
     try {
       const ast = parse(src);
       for (const s of ast.body) execStmt(s);
-      if (env.funcs.main) { try { execBlockValue(env.funcs.main.body); } catch (e) { if (e[RET]) {} else throw e; } }
+
+      // Host-driven mode (games / interactive apps): the host owns the loop and
+      // input; it calls back into named Morpheus functions. Frames run in the
+      // GLOBAL scope, so top-level `let` state persists across frames.
+      if (options.deferMain) {
+        const call = (name, ...args) => {
+          const fn = env.funcs[name];
+          if (!fn) throw new Error("no such function: '" + name + "'");
+          const saved = {};
+          fn.params.forEach((p, i) => { saved[p] = env.vars[p]; env.vars[p] = args[i]; });
+          try { return execBlockValue(fn.body); }
+          catch (e) { if (e[RET]) return e.value; throw e; }
+          finally { fn.params.forEach((p) => { if (saved[p] === undefined) delete env.vars[p]; else env.vars[p] = saved[p]; }); }
+        };
+        if (typeof options.onReady === 'function') options.onReady({ call, env, out });
+        return { output: out.join('\n'), error: null };
+      }
+
+      if (env.funcs.main) {
+        const fn = env.funcs.main;
+        if (fn.params.length) env.vars[fn.params[0]] = (options.argv || []).slice();
+        try { execBlockValue(fn.body); } catch (e) { if (e[RET]) {} else throw e; }
+      }
       return { output: out.join('\n'), error: null };
     } catch (e) {
       return { output: out.join('\n'), error: e.message || String(e) };

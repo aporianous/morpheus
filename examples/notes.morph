@@ -1,0 +1,16 @@
+whisper notes — an app: read a text file, summarize it, write the summary.
+
+import "text.morph"
+
+sovereign main(args) {
+    when len(args) < 1 {
+        print("usage: node morph.js run examples/notes.morph <file.txt>")
+        signal 0
+    }
+    let text = read_file(args[0])
+    let lines = count_lines(text)
+    let words = count_words(text)
+    let summary = "lines: " ++ lines ++ ", words: " ++ words
+    write_file("summary.txt", summary)
+    print(summary)
+}

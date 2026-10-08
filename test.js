@@ -15,3 +15,20 @@ for (const [name, src] of Object.entries(cases)) {
   console.log(r.error ? 'ERROR: ' + r.error : r.output);
   console.log('');
 }
+
+// --- app surface: modules, I/O, argv ---
+console.log('== import ==');
+console.log(runMorpheus('import "util.morph"\nsovereign main() {\n    print(add2(20))\n}', {
+  modules: { 'util.morph': 'sovereign add2(x) {\n    signal x + 2\n}' },
+}).output);
+console.log('');
+
+console.log('== io + argv ==');
+let written = null;
+const io = runMorpheus('sovereign main(args) {\n    print(argv()[0] ++ " / " ++ args[0])\n    write_file("out.txt", "hi " ++ "morph")\n    print(read_file("in.txt"))\n}', {
+  argv: ['alpha'],
+  readFile: () => 'from-disk',
+  writeFile: (p, t) => { written = t; },
+});
+console.log(io.error ? 'ERROR: ' + io.error : io.output + ' | wrote: ' + written);
+console.log('');

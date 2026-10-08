@@ -1,0 +1,34 @@
+whisper text — small string helpers, as a reusable Morpheus module.
+
+sovereign count_lines(text) {
+    let n = 1
+    let i = 0
+    loop i < len(text) {
+        when text[i] == "\n" {
+            let n = n + 1
+        }
+        let i = i + 1
+    }
+    signal n
+}
+
+sovereign count_words(text) {
+    let n = 0
+    let in_word = false
+    let i = 0
+    loop i < len(text) {
+        let c = text[i]
+        let space = (c == " ") or (c == "\n") or (c == "\t")
+        when space {
+            let in_word = false
+        }
+        dream {
+            when not in_word {
+                let n = n + 1
+            }
+            let in_word = true
+        }
+        let i = i + 1
+    }
+    signal n
+}
