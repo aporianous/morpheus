@@ -234,6 +234,9 @@ let e = 0
 let fbok = true
 let msg = ""
 let wrote = false
+let rev_items = []
+let ri = 0
+let solved_review = {}
 
 sovereign unlocked(n) {
     when n == 0 { signal true }
@@ -420,6 +423,64 @@ sovereign weakest_of(unit) {
     signal worst
 }
 
+whisper review buckets (read-only): weak <0.60 (not ready), mid 0.60-0.80, strong >=0.80.
+sovereign weak_concepts(unit) {
+    let cs = concepts_of(unit)
+    let out = []
+    let i = 0
+    loop i < len(cs) {
+        when strength_of(cs[i]) < 0.6 { let out = push(out, cs[i]) }
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign mid_concepts(unit) {
+    let cs = concepts_of(unit)
+    let out = []
+    let i = 0
+    loop i < len(cs) {
+        let s = strength_of(cs[i])
+        when (s >= 0.6) and (s < 0.8) { let out = push(out, cs[i]) }
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign strong_concepts(unit) {
+    let cs = concepts_of(unit)
+    let out = []
+    let i = 0
+    loop i < len(cs) {
+        when strength_of(cs[i]) >= 0.8 { let out = push(out, cs[i]) }
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign find_ex(unit, c) {
+    let found = unit["ex"][0]
+    let i = 0
+    loop i < len(unit["ex"]) {
+        when unit["ex"][i]["concept"] == c { let found = unit["ex"][i] }
+        let i = i + 1
+    }
+    signal found
+}
+
+sovereign build_review(unit) {
+    let picked = pick_review(weak_concepts(unit), mid_concepts(unit), strong_concepts(unit))
+    let items = []
+    let i = 0
+    loop i < len(picked) {
+        let ex = find_ex(unit, picked[i])
+        let item = { "concept": picked[i], "tier": ex["tier"], "q": ex["q"], "code": ex["code"], "opts": ex["opts"], "ans": ex["ans"] }
+        let items = push(items, item)
+        let i = i + 1
+    }
+    signal items
+}
+
 sovereign draw_gate_ready() {
     clear()
     print(units[u]["name"] ++ " — cleared!   stars: " ++ stars_str(ustars[u]))
@@ -444,9 +505,24 @@ sovereign draw_gate_shaky() {
 
 sovereign draw_review() {
     clear()
-    print("REVIEW (coming soon)")
+    print("Quick review — " ++ units[u]["name"] ++ "   (" ++ str(ri + 1) ++ "/" ++ str(len(rev_items)) ++ ")")
     print("")
-    print("ENTER to go back")
+    let it = rev_items[ri]
+    print(it["q"])
+    print("")
+    when len(it["code"]) > 0 { print("   " ++ it["code"]) print("") }
+    let a = it["opts"]
+    let i = 0
+    loop i < len(a) { print("  [" ++ str(i + 1) ++ "] " ++ a[i]) let i = i + 1 }
+    print("")
+    print("Pick 1-" ++ str(len(a)) ++ ".")
+}
+
+sovereign draw_review_done() {
+    clear()
+    print("Review done — nice work.")
+    print("")
+    print("ENTER continue")
 }
 
 sovereign draw() {
@@ -458,6 +534,7 @@ sovereign draw() {
     dream when screen == "gate_ready" { draw_gate_ready() }
     dream when screen == "gate_shaky" { draw_gate_shaky() }
     dream when screen == "review" { draw_review() }
+    dream when screen == "review_done" { draw_review_done() }
     dream when screen == "celebrate" { draw_celebrate() }
     dream when screen == "workspace" { draw_workspace() }
 }
@@ -529,7 +606,7 @@ sovereign frame(k) {
         }
     }
     dream when screen == "gate_ready" {
-        when k == "p" { let screen = "review" }
+        when k == "p" { let screen = "review_open" }
         when (k == "\n") or (k == " ") {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
@@ -547,7 +624,7 @@ sovereign frame(k) {
         when k == "b" { let screen = "map" }
     }
     dream when screen == "gate_shaky" {
-        when k == "r" { let screen = "review" }
+        when k == "r" { let screen = "review_open" }
         when (k == "\n") or (k == " ") {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
@@ -564,8 +641,36 @@ sovereign frame(k) {
         }
         when k == "b" { let screen = "map" }
     }
+    dream when screen == "review_open" {
+        let rev_items = build_review(units[u])
+        let ri = 0
+        let solved_review = {}
+        let screen = "review"
+    }
     dream when screen == "review" {
-        when (k == "\n") or (k == " ") { let screen = "gate_ready" }
+        when (k == "1") or (k == "2") or (k == "3") or (k == "4") {
+            let it = rev_items[ri]
+            let correct = int(k) == it["ans"]
+            let c = it["concept"]
+            let key = "rev:" ++ c ++ str(ri)
+            let first_try = not has(solved_review, key)
+            when not correct { let solved_review = put(solved_review, key, 1) }
+            set_strength(c, strength_update(strength_of(c), correct, tier_index(it["tier"]), first_try))
+            let ri = ri + 1
+            let screen = "review"
+            when ri >= len(rev_items) {
+                let vals = readiness_of(units[u])
+                let ustars = set(ustars, u, stars_of(vals))
+                save()
+                let screen = "review_done"
+            }
+        }
+    }
+    dream when screen == "review_done" {
+        when (k == "\n") or (k == " ") {
+            let vals = readiness_of(units[u])
+            when is_ready(vals) { let screen = "gate_ready" } dream { let screen = "gate_shaky" }
+        }
     }
     dream when screen == "celebrate" {
         when (k == "\n") or (k == " ") { let screen = "map" }
