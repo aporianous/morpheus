@@ -14,5 +14,5 @@ sovereign greet(name: str) -> str {
 
 sovereign main() {
     print(fib(10))
-    print(greet("Perseus"))
+    print(greet("world"))
 }

@@ -55,7 +55,7 @@ if (cmd === 'build') {
   }
   if (!outExe) outExe = abs.replace(/\.morph$/i, '') + '.exe';
   const env = Object.assign({}, process.env);
-  env.PATH = 'C:\\Perseus\\tools\\mingw64\\bin;' + (env.PATH || '');
+  if (process.env.MORPHEUS_CXX_PATH) env.PATH = process.env.MORPHEUS_CXX_PATH + ';' + (env.PATH || '');
   process.stdout.write('C++: ' + cppPath + '\n');
   const r = cp.spawnSync('g++', ['-std=c++17', '-O2', '-static', cppPath, '-o', outExe].concat(link), { stdio: 'inherit', env });
   if (r.error) { process.stderr.write('could not run g++: ' + r.error.message + '\n'); process.exit(1); }

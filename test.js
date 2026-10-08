@@ -1,6 +1,6 @@
 const { runMorpheus } = require('./interp.js');
 const cases = {
-  hello: `sovereign main() {\n    print("Hello, Perseus!")\n}`,
+  hello: `sovereign main() {\n    print("Hello, world!")\n}`,
   vars: `sovereign main() {\n    let greeting \u2190 "Hello"\n    let target \u2190 "Morpheus"\n    print(greeting ++ " " ++ target)\n}`,
   funcs: `sovereign add(a, b) {\n    signal a + b\n}\nsovereign main() {\n    let result \u2190 add(2, 3)\n    print(result)\n}`,
   cond: `sovereign classify(x) {\n    when x > 10 {\n        signal "big"\n    }\n    dream {\n        signal "small"\n    }\n}\nsovereign main() {\n    print(classify(100))\n    print(classify(5))\n}`,

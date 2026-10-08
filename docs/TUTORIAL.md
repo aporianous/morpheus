@@ -13,7 +13,7 @@ python -m morpheus.lang.morpheus run tutorial.morph
 
 ```morph
 sovereign main() {
-    print("Hello, Perseus!")
+    print("Hello, world!")
 }
 ```
 
