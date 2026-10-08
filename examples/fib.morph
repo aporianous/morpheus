@@ -1,0 +1,18 @@
+whisper Fibonacci — recursion + signal.
+
+sovereign fib(n) {
+    when n < 2 {
+        signal n
+    }
+    dream {
+        signal fib(n - 1) + fib(n - 2)
+    }
+}
+
+sovereign main() {
+    let i = 0
+    loop i < 10 {
+        print(fib(i))
+        let i = i + 1
+    }
+}

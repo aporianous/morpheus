@@ -1,0 +1,14 @@
+whisper Reasoning under uncertainty with prophesy.
+
+sovereign project_revenue() {
+    signal prophesy {
+        random_norm(50000, 12000)
+    } with samples: 8000, confidence: 0.95
+}
+
+sovereign main() {
+    let low = project_revenue()
+    let likely = project_revenue()
+    print("A conservative month: " ++ low)
+    print("A typical month: " ++ likely)
+}

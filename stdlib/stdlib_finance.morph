@@ -1,0 +1,351 @@
+vision stdlib_finance
+
+# =============================================================================
+# MORPHEUS ADVANCED FINANCIAL & REVENUE LIBRARY
+# =============================================================================
+# This library provides standard and advanced financial calculations,
+# including loan amortization schedules, investment yield forecasting,
+# compound ROI matrices, progressive tax models, and precise decimal rounding
+# and currency formatting.
+# =============================================================================
+
+# Format helper: rounds to 2 decimal places for financial output
+sovereign finance_format(val) {
+    let scaled ← val * 100
+    let rounded ← round(scaled)
+    signal rounded / 100
+}
+
+# Calculates Compound Interest: P * (1 + r)^n
+sovereign finance_interest(principal, rate, periods) {
+    let term ← 1.0 + rate
+    let multiplier ← 1.0
+    let i ← 0
+    loop i < periods {
+        multiplier = multiplier * term
+        i = i + 1
+    }
+    signal principal * multiplier
+}
+
+# Future Value: PV * (1 + r)^n
+sovereign finance_fv(pv, rate, periods) {
+    signal finance_interest(pv, rate, periods)
+}
+
+# Present Value: FV / (1 + r)^n
+sovereign finance_pv(fv, rate, periods) {
+    let term ← 1.0 + rate
+    let divisor ← 1.0
+    let i ← 0
+    loop i < periods {
+        divisor = divisor * term
+        i = i + 1
+    }
+    signal fv / divisor
+}
+
+# Simple flat tax calculation
+sovereign finance_tax(amount, tax_rate) {
+    signal amount * tax_rate
+}
+
+# ==========================================
+# 1. LOAN AMORTIZATION SCHEDULES
+# ==========================================
+
+# Calculates the full amortization schedule for a loan.
+# Inputs:
+#   principal: The total loan amount (e.g. 250000.0)
+#   annual_rate: Nominal annual interest rate (e.g. 0.065 for 6.5%)
+#   years: Term of the loan in years (e.g. 30)
+#   payments_per_year: Number of payments per year (e.g. 12 for monthly)
+# Returns:
+#   A list of dictionary objects representing each payment:
+#     period: payment index (1 to total_payments)
+#     payment: periodic payment amount (rounded to 2 decimals)
+#     interest: interest portion of the payment (rounded to 2 decimals)
+#     principal: principal portion of the payment (rounded to 2 decimals)
+#     balance: remaining loan balance after this payment (rounded to 2 decimals)
+sovereign finance_amortization_schedule(principal, annual_rate, years, payments_per_year) {
+    let periodic_rate ← annual_rate / payments_per_year
+    let total_payments ← years * payments_per_year
+    let pmt ← 0.0
+    
+    when periodic_rate == 0.0 {
+        pmt = principal / total_payments
+    }
+    dream {
+        let compound ← (1.0 + periodic_rate) ** total_payments
+        pmt = principal * (periodic_rate * compound) / (compound - 1.0)
+    }
+    
+    let schedule ← []
+    let balance ← principal
+    let i ← 1
+    
+    loop i <= total_payments {
+        let interest_part ← balance * periodic_rate
+        let principal_part ← pmt - interest_part
+        
+        # Adjust for rounding on the final payment to wipe out remaining balance
+        when i == total_payments {
+            principal_part = balance
+            pmt = principal_part + interest_part
+        }
+        
+        balance = balance - principal_part
+        when balance < 0.0 {
+            balance = 0.0
+        }
+        
+        let entry ← {
+            "period": i,
+            "payment": finance_format(pmt),
+            "interest": finance_format(interest_part),
+            "principal": finance_format(principal_part),
+            "balance": finance_format(balance)
+        }
+        schedule = schedule + [entry]
+        i = i + 1
+    }
+    
+    signal schedule
+}
+
+# ==========================================
+# 2. ANNUAL YIELD FORECASTING
+# ==========================================
+
+# Forecasts the annual yield of an investment over a multi-year period.
+# Supports discrete compounding (periods_per_year > 0) and continuous compounding (periods_per_year <= 0).
+# Inputs:
+#   principal: Initial investment amount (e.g. 10000.0)
+#   annual_rate: Annual nominal interest rate (e.g. 0.05 for 5%)
+#   compound_periods_per_year: Discrete compounding frequency (e.g. 1 for annual, 12 for monthly, <=0 for continuous)
+#   years: Number of years to forecast
+# Returns:
+#   A list of annual forecast entries:
+#     year: current year index (1 to years)
+#     balance: forecasted balance at the end of the year (rounded to 2 decimals)
+#     interest_earned: total interest earned in that year (rounded to 2 decimals)
+#     total_interest: cumulative interest earned up to that year (rounded to 2 decimals)
+sovereign finance_yield_forecast(principal, annual_rate, compound_periods_per_year, years) {
+    let forecast ← []
+    let prev_balance ← principal
+    let t ← 1
+    
+    loop t <= years {
+        let current_balance ← 0.0
+        when compound_periods_per_year > 0 {
+            let rate_per_period ← annual_rate / compound_periods_per_year
+            let total_periods ← compound_periods_per_year * t
+            current_balance = principal * ((1.0 + rate_per_period) ** total_periods)
+        }
+        dream {
+            # Continuous compounding formula: A = P * e^(r * t)
+            current_balance = principal * exp(annual_rate * t)
+        }
+        
+        let yearly_interest ← current_balance - prev_balance
+        let total_interest_earned ← current_balance - principal
+        
+        let entry ← {
+            "year": t,
+            "balance": finance_format(current_balance),
+            "interest_earned": finance_format(yearly_interest),
+            "total_interest": finance_format(total_interest_earned)
+        }
+        forecast = forecast + [entry]
+        prev_balance = current_balance
+        t = t + 1
+    }
+    
+    signal forecast
+}
+
+# ==========================================
+# 3. COMPOUND ROI MATRICES
+# ==========================================
+
+# Calculates a matrix of compound Return on Investment (ROI) for various interest rates and time horizons.
+# Inputs:
+#   principal: The initial investment amount (e.g. 5000.0)
+#   rates: A list of annual growth rates to evaluate (e.g. [0.04, 0.06, 0.08])
+#   years_list: A list of investment horizons in years (e.g. [5, 10, 20])
+# Returns:
+#   A list of rate row dictionaries:
+#     rate: the evaluated growth rate
+#     results: a list of year-specific results containing:
+#       years: number of years
+#       value: future value of investment (rounded to 2 decimals)
+#       roi_percent: cumulative ROI percentage (rounded to 2 decimals)
+sovereign finance_roi_matrix(principal, rates, years_list) {
+    let matrix ← []
+    let num_rates ← len(rates)
+    let num_years ← len(years_list)
+    
+    let r_idx ← 0
+    loop r_idx < num_rates {
+        let rate ← rates[r_idx]
+        let row_results ← []
+        
+        let y_idx ← 0
+        loop y_idx < num_years {
+            let years ← years_list[y_idx]
+            let final_val ← principal * ((1.0 + rate) ** years)
+            let net_profit ← final_val - principal
+            let roi_pct ← (net_profit / principal) * 100.0
+            
+            let result_entry ← {
+                "years": years,
+                "value": finance_format(final_val),
+                "roi_percent": finance_format(roi_pct)
+            }
+            row_results = row_results + [result_entry]
+            y_idx = y_idx + 1
+        }
+        
+        let rate_row ← {
+            "rate": rate,
+            "results": row_results
+        }
+        matrix = matrix + [rate_row]
+        r_idx = r_idx + 1
+    }
+    
+    signal matrix
+}
+
+# ==========================================
+# 4. TAX BRACKET MODELS
+# ==========================================
+
+# Calculates progressive income tax based on a list of tax brackets.
+# Inputs:
+#   income: The taxable income amount (e.g. 95000.0)
+#   brackets: A list of tax brackets (dictionaries), sorted by limit ascending:
+#     limit: upper income limit of the bracket (use negative limit, e.g. -1, for the top catch-all bracket)
+#     rate: tax rate for the income within this bracket range (e.g. 0.10 for 10%)
+# Returns:
+#   The total tax amount due (rounded to 2 decimals)
+sovereign finance_progressive_tax(income, brackets) {
+    when income <= 0.0 {
+        signal 0.0
+    }
+    
+    let total_tax ← 0.0
+    let prev_limit ← 0.0
+    let num_brackets ← len(brackets)
+    let i ← 0
+    
+    loop i < num_brackets {
+        let bracket ← brackets[i]
+        let limit ← bracket["limit"]
+        let rate ← bracket["rate"]
+        
+        let current_limit ← limit
+        when limit < 0.0 {
+            current_limit = income
+        }
+        
+        when income > prev_limit {
+            let taxable_in_bracket ← income
+            when income > current_limit {
+                taxable_in_bracket = current_limit
+            }
+            let amount ← taxable_in_bracket - prev_limit
+            when amount > 0.0 {
+                total_tax = total_tax + (amount * rate)
+            }
+        }
+        
+        prev_limit = current_limit
+        i = i + 1
+    }
+    
+    signal finance_format(total_tax)
+}
+
+# Calculates the effective tax rate as a percentage of total income.
+# Inputs:
+#   income: Total income amount
+#   total_tax: Total tax amount paid
+# Returns:
+#   Effective tax rate percentage (rounded to 2 decimals)
+sovereign finance_effective_tax_rate(income, total_tax) {
+    when income <= 0.0 {
+        signal 0.0
+    }
+    dream {
+        signal finance_format((total_tax / income) * 100.0)
+    }
+}
+
+# ==========================================
+# 5. DECIMAL CURRENCY UTILITIES
+# ==========================================
+
+# Rounds a value to a specified number of decimal places.
+# Inputs:
+#   val: Numeric value to round
+#   decimals: Number of decimal places
+sovereign finance_currency_round(val, decimals) {
+    let factor ← 10.0 ** decimals
+    let scaled ← val * factor
+    let rounded ← round(scaled)
+    signal rounded / factor
+}
+
+# Formats a numeric value as a currency string with a symbol and exactly 2 decimal places.
+# Inputs:
+#   val: Numeric value to format
+#   symbol: Currency symbol string (e.g. "$", "€")
+# Returns:
+#   A string formatted like "$1250.50" or "€0.00"
+sovereign finance_currency_format(val, symbol) {
+    let rounded ← finance_format(val)
+    let s ← "" ++ rounded
+    let length ← len(s)
+    let dot_idx ← -1
+    let i ← 0
+    
+    loop i < length {
+        when s[i] == "." {
+            dot_idx = i
+            i = length
+        }
+        i = i + 1
+    }
+    
+    let formatted ← s
+    when dot_idx == -1 {
+        formatted = s ++ ".00"
+    }
+    dream {
+        let decimals_count ← length - dot_idx - 1
+        when decimals_count == 1 {
+            formatted = s ++ "0"
+        }
+    }
+    
+    signal symbol ++ formatted
+}
+
+# Calculates Net Present Value (NPV) for a discount rate and a list of cash flows.
+# Inputs:
+#   discount_rate: The annual discount rate (e.g. 0.08 for 8%)
+#   cash_flows: List of cash flows starting at period 0 (initial investment)
+# Returns:
+#   NPV of cash flows (rounded to 2 decimals)
+sovereign finance_npv(discount_rate, cash_flows) {
+    let total_npv ← 0.0
+    let count ← len(cash_flows)
+    let t ← 0
+    loop t < count {
+        let divisor ← (1.0 + discount_rate) ** t
+        total_npv = total_npv + (cash_flows[t] / divisor)
+        t = t + 1
+    }
+    signal finance_format(total_npv)
+}

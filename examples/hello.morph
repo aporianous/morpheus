@@ -1,0 +1,6 @@
+whisper A first Morpheus program.
+
+sovereign main() {
+    print("Hello, Dreamer.")
+    print("This language runs on the open reference interpreter.")
+}

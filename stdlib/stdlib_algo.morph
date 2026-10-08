@@ -1,0 +1,350 @@
+# Morpheus Advanced Algorithms & Data Structures Library
+
+# ==========================================
+# 1. EFFICIENT SORTING ALGORITHMS
+# ==========================================
+
+# Quicksort: O(N log N) average-case sorting algorithm.
+# Recursively partitions elements around a pivot.
+sovereign quicksort(items) {
+    let n ← len(items)
+    when n <= 1 {
+        signal items
+    }
+    dream {
+        let pivot ← items[0]
+        let left ← []
+        let middle ← []
+        let right ← []
+        let i ← 0
+        loop i < n {
+            let val ← items[i]
+            when val < pivot {
+                left = left + [val]
+            }
+            dream {
+                when val == pivot {
+                    middle = middle + [val]
+                }
+                dream {
+                    right = right + [val]
+                }
+            }
+            i = i + 1
+        }
+        signal quicksort(left) + middle + quicksort(right)
+    }
+}
+
+# Helper merge function for mergesort.
+sovereign merge(left, right) {
+    let result ← []
+    let i ← 0
+    let j ← 0
+    let len_l ← len(left)
+    let len_r ← len(right)
+    
+    loop (i < len_l) && (j < len_r) {
+        when left[i] <= right[j] {
+            result = result + [left[i]]
+            i = i + 1
+        }
+        dream {
+            result = result + [right[j]]
+            j = j + 1
+        }
+    }
+    
+    loop i < len_l {
+        result = result + [left[i]]
+        i = i + 1
+    }
+    loop j < len_r {
+        result = result + [right[j]]
+        j = j + 1
+    }
+    
+    signal result
+}
+
+# Mergesort: O(N log N) stable sorting algorithm.
+# Recursively splits lists and merges them.
+sovereign mergesort(items) {
+    let n ← len(items)
+    when n <= 1 {
+        signal items
+    }
+    dream {
+        let mid ← n / 2
+        let mid_int ← mid - (mid % 1)
+        
+        let left ← []
+        let right ← []
+        let i ← 0
+        loop i < n {
+            when i < mid_int {
+                left = left + [items[i]]
+            }
+            dream {
+                right = right + [items[i]]
+            }
+            i = i + 1
+        }
+        
+        let sorted_left ← mergesort(left)
+        let sorted_right ← mergesort(right)
+        
+        signal merge(sorted_left, sorted_right)
+    }
+}
+
+# ==========================================
+# 2. QUEUES & STACKS (FIFO, LIFO, PRIORITY QUEUE)
+# ==========================================
+
+# FIFO Queue: First-In-First-Out data structure.
+sovereign queue_create() {
+    signal {"items": []}
+}
+
+# Enqueues an item at the end of the queue.
+sovereign queue_enqueue(q, val) {
+    q["items"] = q["items"] + [val]
+    signal q
+}
+
+# Dequeues and returns the front item of the queue.
+sovereign queue_dequeue(q) {
+    let items ← q["items"]
+    let n ← len(items)
+    when n == 0 {
+        signal -1
+    }
+    dream {
+        let val ← items[0]
+        let new_items ← []
+        let i ← 1
+        loop i < n {
+            new_items = new_items + [items[i]]
+            i = i + 1
+        }
+        q["items"] = new_items
+        signal val
+    }
+}
+
+# Checks if the queue is empty.
+sovereign queue_empty(q) {
+    signal len(q["items"]) == 0
+}
+
+# Returns the current size of the queue.
+sovereign queue_size(q) {
+    signal len(q["items"])
+}
+
+# LIFO Stack: Last-In-First-Out data structure.
+sovereign stack_create() {
+    signal {"items": []}
+}
+
+# Pushes an item onto the top of the stack.
+sovereign stack_push(s, val) {
+    s["items"] = s["items"] + [val]
+    signal s
+}
+
+# Pops and returns the top item from the stack.
+sovereign stack_pop(s) {
+    let items ← s["items"]
+    let n ← len(items)
+    when n == 0 {
+        signal -1
+    }
+    dream {
+        let val ← items[n - 1]
+        let new_items ← []
+        let i ← 0
+        loop i < (n - 1) {
+            new_items = new_items + [items[i]]
+            i = i + 1
+        }
+        s["items"] = new_items
+        signal val
+    }
+}
+
+# Peeks at the top item of the stack without removing it.
+sovereign stack_peek(s) {
+    let items ← s["items"]
+    let n ← len(items)
+    when n == 0 {
+        signal -1
+    }
+    dream {
+        signal items[n - 1]
+    }
+}
+
+# Checks if the stack is empty.
+sovereign stack_empty(s) {
+    signal len(s["items"]) == 0
+}
+
+# Priority Queue: Binary/List based min-priority queue.
+sovereign pq_create() {
+    signal {"items": [], "priorities": []}
+}
+
+# Inserts an item into the priority queue with a numeric priority.
+sovereign pq_insert(pq, item, priority) {
+    pq["items"] = pq["items"] + [item]
+    pq["priorities"] = pq["priorities"] + [priority]
+    signal pq
+}
+
+# Extracts and returns the item with the minimum priority.
+sovereign pq_extract_min(pq) {
+    let items ← pq["items"]
+    let priorities ← pq["priorities"]
+    let n ← len(priorities)
+    when n == 0 {
+        signal -1
+    }
+    dream {
+        let min_idx ← 0
+        let min_prio ← priorities[0]
+        let i ← 1
+        loop i < n {
+            when priorities[i] < min_prio {
+                min_prio = priorities[i]
+                min_idx = i
+            }
+            i = i + 1
+        }
+        
+        let min_item ← items[min_idx]
+        
+        let new_items ← []
+        let new_priorities ← []
+        let j ← 0
+        loop j < n {
+            when j != min_idx {
+                new_items = new_items + [items[j]]
+                new_priorities = new_priorities + [priorities[j]]
+            }
+            j = j + 1
+        }
+        pq["items"] = new_items
+        pq["priorities"] = new_priorities
+        signal min_item
+    }
+}
+
+# Checks if the priority queue is empty.
+sovereign pq_empty(pq) {
+    signal len(pq["priorities"]) == 0
+}
+
+# Returns the number of items in the priority queue.
+sovereign pq_size(pq) {
+    signal len(pq["priorities"])
+}
+
+# ==========================================
+# 3. SETS & BINARY SEARCH TREES
+# ==========================================
+
+# Hash-set simulation using dictionary keys.
+sovereign hashset_create() {
+    signal {"elements": {}}
+}
+
+# Adds an element to the hashset.
+sovereign hashset_add(s, val) {
+    let elems ← s["elements"]
+    elems[val] = true
+    signal s
+}
+
+# Checks if the hashset contains the given element.
+sovereign hashset_contains(s, val) {
+    let elems ← s["elements"]
+    signal val in elems
+}
+
+# Removes an element from the hashset.
+sovereign hashset_remove(s, val) {
+    let elems ← s["elements"]
+    when val in elems {
+        let new_elems ← {}
+        for key in elems {
+            when key != val {
+                new_elems[key] = true
+            }
+        }
+        s["elements"] = new_elems
+    }
+    signal s
+}
+
+# Returns the number of elements in the hashset.
+sovereign hashset_size(s) {
+    signal len(s["elements"])
+}
+
+# Binary Search Tree: BST node simulation using nested dictionaries.
+# Tree root is 0 when empty.
+sovereign bst_create() {
+    signal 0
+}
+
+# Inserts a value recursively into the BST. Returns the updated node/tree.
+sovereign bst_insert(node, val) {
+    when node == 0 {
+        signal {"val": val, "left": 0, "right": 0}
+    }
+    dream {
+        let node_val ← node["val"]
+        when val < node_val {
+            node["left"] = bst_insert(node["left"], val)
+        }
+        dream {
+            when val > node_val {
+                node["right"] = bst_insert(node["right"], val)
+            }
+        }
+        signal node
+    }
+}
+
+# Searches for a value recursively in the BST. Returns true/false.
+sovereign bst_search(node, val) {
+    when node == 0 {
+        signal false
+    }
+    dream {
+        let node_val ← node["val"]
+        when val == node_val {
+            signal true
+        }
+        dream {
+            when val < node_val {
+                signal bst_search(node["left"], val)
+            }
+            dream {
+                signal bst_search(node["right"], val)
+            }
+        }
+    }
+}
+
+# Traverses BST in-order to produce a sorted list.
+sovereign bst_inorder(node) {
+    when node == 0 {
+        signal []
+    }
+    dream {
+        signal bst_inorder(node["left"]) + [node["val"]] + bst_inorder(node["right"])
+    }
+}
