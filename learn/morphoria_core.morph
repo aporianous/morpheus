@@ -12,3 +12,33 @@ sovereign strength_update(cur, correct, tier_index, first_try) {
     when s < 0.0 { let s = 0.0 }
     signal s
 }
+
+sovereign min_of_list(xs) {
+    let m = 2.0
+    let i = 0
+    loop i < len(xs) {
+        when xs[i] < m { let m = xs[i] }
+        let i = i + 1
+    }
+    signal m
+}
+
+sovereign apply_decay(cur, days) {
+    when days <= 0 { signal cur }
+    let s = cur - 0.02 * days
+    when s < 0.2 { let s = 0.2 }
+    when s > cur { let s = cur }
+    signal s
+}
+
+sovereign is_ready(xs) {
+    signal min_of_list(xs) >= 0.6
+}
+
+sovereign stars_of(xs) {
+    let mn = min_of_list(xs)
+    when mn >= 0.8 { signal 3 }
+    when mn >= 0.6 { signal 2 }
+    when mn >= 0.4 { signal 1 }
+    signal 0
+}
