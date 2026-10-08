@@ -25,9 +25,9 @@ See `docs/LEARN.md`, then build real apps in `examples/apps/`.
 - An **extension API** — register builtins, add language features, ship packages.
 - Docs and an interactive tutorial.
 
-## Private
-- The production **runtime** — a separate, private component used for deployment.
-  Everything in this repo runs on the open reference interpreter above.
+## Open core
+This repository is the open core of Morpheus: the language, the reference
+interpreter, the standard library, the extension API, the docs and the tutorial.
 
 ## Try it
 - **Interactive:** open `index.html` (or the GitHub Pages site).
@@ -149,10 +149,8 @@ runMorpheus(src, { builtins: { double: (x) => x * 2 } });
 | `examples/` | sample apps, incl. a full `snake.morph` game |
 
 ## Status
-The language and reference interpreter are real and tested. A separate
-production runtime is used for deployment; it is not included here.
+The language and reference interpreter are real and tested.
 
 ## License
 The language, interpreter, docs and stdlib in this repo are **MIT** (see
-`LICENSE`). The name *Morpheus* and the production runtime remain
-proprietary to Aporia Nous.
+`LICENSE`). *Morpheus* is a trademark of Aporia Nous.
