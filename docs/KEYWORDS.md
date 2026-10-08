@@ -1,4 +1,4 @@
-# KEYWORDS.md — Morpheus Alien Vocabulary
+# KEYWORDS.md — Morpheus Vocabulary
 
 Every keyword in Morpheus comes from the language of dreams, sovereignty,
 and transformation. There is no overlap with any existing programming
