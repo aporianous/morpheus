@@ -26,7 +26,7 @@ for (const [n, c] of Object.entries({
 })) BUILTINS[n] = { c, var: false };
 for (const [n, c] of Object.entries({
   print: 'rt_print', echo: 'rt_print', min: 'rt_min', max: 'rt_max', round: 'rt_round',
-  morph_rewrite: 'rt_noop', morph_constant: 'rt_noop', input: 'rt_noop',
+  morph_rewrite: 'rt_noop', morph_constant: 'rt_noop', input: 'rt_noop', assert: 'rt_assert',
   type: 'rt_type', int: 'rt_toint', float: 'rt_tofloat', str: 'rt_tostr',
   floor: 'rt_floor', ceil: 'rt_ceil', tan: 'rt_tan', log: 'rt_log',
   upper: 'rt_upper', lower: 'rt_lower', trim: 'rt_trim', split: 'rt_split', join: 'rt_join',

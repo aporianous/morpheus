@@ -24,8 +24,9 @@ open; a separate production runtime is private.
   ```
   node -e "console.log(require('./interp.js').runMorpheus('sovereign main(){ print(1 + 2) }').output)"
   ```
-- **CLI** — run programs and games:
+- **CLI** — REPL, run programs and games:
   ```
+  node morph.js repl                                            # interactive REPL
   node morph.js run  examples/notes.morph examples/sample.txt   # a batch app
   node morph.js play examples/snake.morph                       # a real-time game
   ```

@@ -141,6 +141,7 @@ Strings: `upper lower trim split join substr replace starts_with ends_with repea
 Lists: `push pop shift unshift insert remove set reverse`
 Maps: `keys values has get put del contains`
 I/O & host: `read_file write_file argv env clock clear sleep key print echo`
+Testing: `assert(cond [, message])` — raises `AssertionError` if `cond` is false
 
 ## Memory
 ```
@@ -224,18 +225,47 @@ are no namespaces yet), and each file is loaded **once** — a cycle (A imports 
 imports A) is resolved by loading each file a single time, never by hanging.
 Paths are relative to the importing file.
 
-## Grammar (informal)
+## Grammar (EBNF)
 ```
-program   := (import | extern | funct | stmt)*
-funct     := "sovereign" NAME "(" params ")" ("->" type)? block
-stmt      := "let" NAME "=" expr | "when" expr block ("dream" ...)?
-           | "loop" expr block | "for" NAME "in" expr block
-           | "break" | "continue" | "signal" expr | "return" expr
-           | "arena" block | "prophesy" expr | assign | expr
-expr      := term (("+"|"-"|"++") term)*
-term      := factor (("*"|"/"|"%") factor)*
-unary     := ("-"|"!") unary | postfix
-postfix   := primary (call | index | slice | "." NAME)*
-primary   := NUMBER | STRING | "true" | "false" | NAME | list | map | "(" expr ")"
-           | range | ternary
+program    = { import | extern | struct | function | statement } ;
+import     = "import" STRING ;
+extern     = "extern" IDENT "(" [ param { "," param } ] ")" [ "->" type ] ;
+struct     = "struct" IDENT "{" IDENT { "," IDENT } "}" ;
+function   = "sovereign" IDENT "(" [ param { "," param } ] ")" [ "->" type ] block ;
+param      = IDENT [ ":" type ] ;
+type       = "int" | "float" | "str" | "bool" ;
+
+statement  = "let" IDENT [ ":" type ] "=" expr
+           | lvalue "=" expr
+           | "when" expr block [ "dream" ( "when" expr block | block ) ]
+           | "loop" expr block
+           | "for" IDENT [ "," IDENT ] "in" expr block
+           | "break" | "continue"
+           | "signal" expr
+           | "heal" block [ "dream" block ]
+           | "arena" block
+           | expr ;
+block      = "{" { statement } "}" ;
+lvalue     = IDENT { "." IDENT | "[" expr "]" } ;
+
+expr       = ternary ;
+ternary    = range [ "?" expr ":" expr ] ;
+range      = or { ".." or } ;
+or         = and  { ( "or"  | "||" ) and } ;
+and        = eq   { ( "and" | "&&" ) eq } ;
+eq         = cmp  { ( "=="  | "!=" ) cmp } ;
+cmp        = add  { ( ">" | "<" | ">=" | "<=" ) add } ;
+add        = mul  { ( "+" | "-" | "++" ) mul } ;
+mul        = pow  { ( "*" | "/" | "%" ) pow } ;
+pow        = unary { "**" unary } ;
+unary      = ( "-" | "!" | "not" ) unary | postfix ;
+postfix    = primary { "(" [ expr { "," expr } ] ")" | "." IDENT
+                     | "[" [ expr ] [ ":" [ expr ] ] "]" } ;
+primary    = NUMBER | STRING | "true" | "false" | IDENT
+           | "(" expr ")"
+           | "[" [ expr { "," expr } ] "]"                       (* list *)
+           | "{" [ expr ":" expr { "," expr ":" expr } ] "}"     (* map *)
+           | "fn" "(" [ IDENT { "," IDENT } ] ")" block          (* lambda *)
+           | "prophesy" block ;
 ```
+`whisper` starts a comment to end of line.

@@ -15,7 +15,7 @@
     while (i < src.length) {
       const c = src[i];
       if (c === '\n') { line++; i++; continue; }
-      if (c === ' ' || c === '\t' || c === '\r') { i++; continue; }
+      if (c === ' ' || c === '\t' || c === '\r' || c === '\uFEFF') { i++; continue; }
       // comments
       if (c === '#' || (c === '/' && src[i+1] === '/')) { while (i < src.length && src[i] !== '\n') i++; continue; }
       if (src.startsWith('whisper', i) && !/[\w$]/.test(src[i+7] || '')) { while (i < src.length && src[i] !== '\n') i++; continue; }
@@ -346,6 +346,7 @@
         keys: (m) => Array.from(m.keys()).sort(), values: (m) => Array.from(m.keys()).sort().map((k) => m.get(k)),
         has: (m, k) => m.has(k), get: (m, k, d) => m.has(k) ? m.get(k) : (d === undefined ? undefined : d),
         put: (m, k, v) => { m.set(k, v); return m; }, del: (m, k) => { m.delete(k); return m; },
+        assert: (c, m) => { if (!truthy(c)) throw new Error('AssertionError' + (m === undefined ? '' : ': ' + fmt(m))); return undefined; },
         input: () => '',
         clear: () => { if (options.host && options.host.clear) options.host.clear(); return undefined; },
         sleep: (ms) => { if (options.host && options.host.sleep) options.host.sleep(ms); return undefined; },

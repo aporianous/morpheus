@@ -28,6 +28,8 @@ const edge = {
   'stdlib-str': `sovereign main(){ print(abs(0-5)) print(pow(2,10)) print(sqrt(2)) print(round(3.14159,2)) print(floor(2.9)) print(ceil(2.1)) print(sin(0)) print(cos(0)) print(exp(0)) print(tan(0)) print(log(1)) print(min(3,1,2)) print(max(3,1,2)) print(int(3.9)) print(float(2)) print(str(42)) print(upper("ab")) print(lower("AB")) print(trim("  x  ")) print(split("a,b,c",",")) print(join(["a","b"],"-")) print(contains("abc","b")) print(index_of("abc","c")) print(substr("abcdef",1,4)) print(replace("aaa","a","b")) print(starts_with("abc","ab")) print(ends_with("abc","bc")) print(repeat("ab",2)) }`,
   'stdlib-list': `sovereign main(){ let l=[3,1,2] print(len(l)) print(sort(l)) print(reverse(l)) print(sum(l)) print(min_of(l)) print(max_of(l)) print(contains(l,2)) print(index_of(l,1)) push(l,9) print(l) print(pop(l)) print(l) unshift(l,0) print(l) print(shift(l)) print(l) insert(l,1,7) print(l) remove(l,7) print(l) set(l,0,99) print(l) remove_at(l,0) print(l) print(range(0,5)) print(range(2,8,2)) }`,
   'stdlib-map': `sovereign main(){ let m={"a":1,"b":2} print(m.keys()) print(m.values()) print(m.has("a")) print(m.get("z",0)) put(m,"c",3) print(m) del(m,"a") print(m) print(type(m)) }`,
+  'assert-ok': `sovereign main(){ assert(1==1) assert(len([1,2,3])==3,"l") assert(upper("a")=="A") print("ok") }`,
+  'err-assert': `sovereign main(){ assert(1==2, "nope") }`,
   'heal-basic': `sovereign main(){ heal { print(1/0) print("x") } dream { print("caught") } print("after") }`,
   'heal-ok': `sovereign main(){ heal { print("fine") } dream { print("no") } print("after") }`,
   'heal-nested': `sovereign boom(){ signal 1/0 } sovereign main(){ heal { boom() } dream { print("recovered") } }`,

@@ -7,9 +7,35 @@ const fs = require('fs');
 const path = require('path');
 const { runMorpheus } = require('./interp.js');
 
+function repl() {
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'morph> ' });
+  const lines = [];
+  let pending = [];
+  let shown = 0;
+  const depth = (s) => { let d = 0; for (const c of s) { if ('{(['.includes(c)) d++; else if ('})]'.includes(c)) d--; } return d; };
+  process.stdout.write('Morpheus REPL — type code, Ctrl-D to exit. (state persists across lines)\n');
+  rl.prompt();
+  rl.on('line', (ln) => {
+    pending.push(ln);
+    if (depth(pending.join('\n')) > 0) { rl.setPrompt('   ...> '); rl.prompt(); return; }
+    lines.push(pending.join('\n')); pending = [];
+    const r = runMorpheus(lines.join('\n'), {
+      argv: [], env: (k) => process.env[k],
+      readFile: (p) => fs.readFileSync(p, 'utf8'), writeFile: (p, t) => fs.writeFileSync(p, t),
+      resolve: (p) => path.resolve(process.cwd(), p),
+    });
+    if (r.error) { process.stderr.write('Error: ' + r.error + '\n'); lines.pop(); }
+    else { const out = r.output ? r.output.split('\n') : []; for (let i = shown; i < out.length; i++) process.stdout.write(out[i] + '\n'); shown = out.length; }
+    rl.setPrompt('morph> '); rl.prompt();
+  });
+  rl.on('close', () => { process.stdout.write('\n'); process.exit(0); });
+}
+
 const [cmd, file, ...rest] = process.argv.slice(2);
+if (cmd === 'repl') { repl(); return; }
 if ((cmd !== 'run' && cmd !== 'play' && cmd !== 'build') || !file) {
-  process.stdout.write('Usage:\n  node morph.js run   <file.morph> [args...]\n  node morph.js play  <file.morph>\n  node morph.js build <file.morph> [-o out.exe]   # compile to a native binary\n');
+  process.stdout.write('Usage:\n  node morph.js repl                          # interactive REPL\n  node morph.js run   <file.morph> [args...]\n  node morph.js play  <file.morph>\n  node morph.js build <file.morph> [-o out.exe]   # compile to a native binary\n');
   process.exit(2);
 }
 const abs = path.resolve(file);
