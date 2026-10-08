@@ -341,9 +341,21 @@ function loadModule(absPath, seen, out) {
     else out.tops.push(st);
   }
 }
+const TYPED_UNSUPPORTED = new Set(['ForIn', 'List', 'Index', 'Map', 'Range', 'Slice', 'Member', 'Lambda', 'Prophesy', 'Weave', 'Import', 'TypeDecl', 'Heal']);
+function findUnsupportedTyped(node) {           // conservative: if ANY unsupported node appears, not typed
+  let bad = false;
+  (function rec(n) {
+    if (bad || !n || typeof n !== 'object') return;
+    if (Array.isArray(n)) { for (const x of n) rec(x); return; }
+    if (n.type && TYPED_UNSUPPORTED.has(n.type)) { bad = true; return; }
+    if (n.type === 'Assign' && n.target && n.target.type !== 'Ident') { bad = true; return; }
+    for (const k in n) rec(n[k]);
+  })(node);
+  return bad;
+}
 function fullyTyped(f) {
-  return f.returnType && Object.prototype.hasOwnProperty.call(CTYPE, f.returnType) &&
-    f.params.every((p, i) => isScalar(f.paramTypes[i]));
+  if (!(f.returnType && Object.prototype.hasOwnProperty.call(CTYPE, f.returnType) && f.params.every((p, i) => isScalar(f.paramTypes[i])))) return false;
+  return !findUnsupportedTyped(f.body);   // graceful: fall back to dynamic instead of erroring
 }
 
 function compileToCpp(absPath) {

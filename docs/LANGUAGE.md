@@ -153,6 +153,24 @@ import "text.morph"                       # load a module
 extern sqrt(x: float) -> float            # bind a C function (link with -l m)
 ```
 
+## Static types (optional)
+Annotate a function's parameters and return type and the native backend emits real
+C++ scalars — no boxing, no heap, no GC:
+```
+sovereign fib(n: int) -> int { when n < 2 { signal n } signal fib(n-1)+fib(n-2) }
+sovereign greet(name: str) -> str { signal "Hi " ++ name }
+```
+Type map: `int`→`long long`, `float`→`double`, `str`→`std::string`, `bool`→`bool`.
+
+Typed mode is an **optimization for scalar functions**, not a separate semantics.
+If an annotated function's body uses anything outside scalars (lists, maps,
+structs, lambdas, `for … in`, slicing, …), the backend **falls back to the dynamic
+path for that function** — the program still compiles and behaves identically.
+The reference interpreter ignores annotations entirely (it is always dynamic), so
+the language's meaning is always the dynamic semantics; types only speed up
+scalar code. (A typed function may call builtins, `extern`s, and other typed
+functions.)
+
 ## Semantics (normative)
 
 These rules are guaranteed identical on the reference interpreter and the

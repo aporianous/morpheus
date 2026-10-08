@@ -25,6 +25,8 @@ const edge = {
   'bool-eq': `sovereign main(){ print(true) print(false) print(1 == 1) print(1 != 2) print(2 > 1) print(not true) print(true and false) print(true or false) }`,
   'division': `sovereign main(){ print(1/3) print(2/3*3) print(10 % 3) print(-7 % 3) print(2 ** 10) }`,
   'recurse': `sovereign fib(n){ when n < 2 { signal n } signal fib(n-1)+fib(n-2) } sovereign main(){ print(fib(15)) }`,
+  'typed-scalar': `sovereign f(n: int) -> int { when n < 2 { signal n } signal f(n-1)+f(n-2) } sovereign main(){ print(f(12)) }`,
+  'typed-fallback': `sovereign s(x: int) -> int { let a=[1,2,3] signal x+len(a) } sovereign main(){ print(s(10)) print(s(0)) }`,
   'forin-kv-map': `sovereign main(){ let m={"b":2,"a":1,"c":3} for k,v in m { print(k) print(v) } }`,
   'forin-kv-list': `sovereign main(){ for i,x in [10,20,30] { print(i) print(x) } }`,
   'forin-kv-str': `sovereign main(){ for i,c in "abc" { print(i) print(c) } }`,
