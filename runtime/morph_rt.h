@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -29,12 +30,14 @@
 struct Value;
 using List = std::vector<Value>;
 using Map = std::map<std::string, Value>;
+using FnT = std::function<Value(std::vector<Value>)>;
 
 struct Value {
-  enum K { NUM, STR, BOOL, LIST, MAP } k;
+  enum K { NUM, STR, BOOL, LIST, MAP, FUNC } k;
   double n; bool b; std::string s;
   std::shared_ptr<List> l;
   std::shared_ptr<Map> m;
+  std::shared_ptr<FnT> fnv;
   Value(): k(NUM), n(0), b(false) {}
   Value(double x): k(NUM), n(x), b(false) {}
   Value(long long x): k(NUM), n((double)x), b(false) {}
@@ -45,6 +48,7 @@ struct Value {
   Value(const std::string& x): k(STR), n(0), b(false), s(x) {}
   Value(List x): k(LIST), n(0), b(false) { l = std::make_shared<List>(std::move(x)); }
   Value(std::shared_ptr<Map> mm): k(MAP), n(0), b(false), m(mm) {}
+  Value(std::shared_ptr<FnT> fn): k(FUNC), n(0), b(false), fnv(fn) {}
 };
 
 struct RTError : std::runtime_error {
@@ -57,6 +61,7 @@ inline bool rt_truthy(const Value& v) {
   if (v.k == Value::NUM)  return v.n != 0;
   if (v.k == Value::STR)  return !v.s.empty();
   if (v.k == Value::MAP) return v.m && !v.m->empty();
+  if (v.k == Value::FUNC) return true;
   return v.l && !v.l->empty();
 }
 inline double rt_num(const Value& v) {
@@ -66,6 +71,7 @@ inline std::string rt_str(const Value& v) {
   if (v.k == Value::STR) return v.s;
   if (v.k == Value::NUM) { double x = v.n; if (x == (long long)x && std::fabs(x) < 1e15) return std::to_string((long long)x); char b[64]; std::snprintf(b, sizeof b, "%.6f", x); std::string t(b); size_t dot = t.find('.'); if (dot != std::string::npos) { size_t last = t.find_last_not_of('0'); if (last == dot) last = dot - 1; t.erase(last + 1); } return t; }
   if (v.k == Value::BOOL) return v.b ? "true" : "false";
+  if (v.k == Value::FUNC) return "<fn>";
   if (v.k == Value::MAP) { std::string out = "{"; size_t i = 0; for (auto& kv : *v.m) { if (i++) out += ", "; out += kv.first + ": " + rt_str(kv.second); } return out + "}"; }
   std::string out = "[";
   for (size_t i = 0; i < v.l->size(); ++i) { if (i) out += ", "; out += rt_str((*v.l)[i]); }
@@ -90,6 +96,7 @@ inline bool rt_eqv(const Value& a, const Value& b) {
   if ((a.k == Value::NUM || a.k == Value::BOOL) && (b.k == Value::NUM || b.k == Value::BOOL)) return rt_num(a) == rt_num(b);
   if (a.k == Value::STR && b.k == Value::STR) return a.s == b.s;
   if (a.k == Value::MAP || b.k == Value::MAP) return a.k == b.k && a.m == b.m;
+  if (a.k == Value::FUNC || b.k == Value::FUNC) return a.k == b.k && a.fnv == b.fnv;
   if (a.k == Value::LIST && b.k == Value::LIST) {
     if (a.l->size() != b.l->size()) return false;
     for (size_t i = 0; i < a.l->size(); ++i) if (!rt_eqv((*a.l)[i], (*b.l)[i])) return false;
@@ -135,6 +142,7 @@ inline Value rt_index(const Value& o, const Value& i) {
   if (o.k == Value::MAP) { auto it = o.m->find(rt_str(i)); if (it == o.m->end()) throw RTError("KeyError: " + rt_str(i)); return it->second; }
   throw RTError("IndexError: not indexable (kind " + std::to_string((int)o.k) + ")");
 }
+inline Value rt_call(Value f, std::vector<Value> a) { if (f.k == Value::FUNC && f.fnv) return (*f.fnv)(a); throw RTError("TypeError: not a function"); }
 inline Value rt_set_index(Value o, Value i, Value v) { if (o.k == Value::MAP) { (*o.m)[rt_str(i)] = v; return v; } if (o.k == Value::LIST) { long long idx = (long long)rt_num(i); if (idx < 0 || idx >= (long long)o.l->size()) throw RTError("IndexError list set idx " + std::to_string(idx) + " size " + std::to_string(o.l->size())); (*o.l)[idx] = v; return v; } throw RTError("IndexError: not assignable"); }
 inline Value rt_push(Value l, Value v) { l.l->push_back(v); return l; }
 inline Value rt_pop(Value l) { if (l.l->empty()) return Value(0.0); Value v = l.l->back(); l.l->pop_back(); return v; }
@@ -172,7 +180,7 @@ inline Value rt_arena_bytes() {
 inline Value rt_args(int argc, char** argv) { List l; for (int i = 1; i < argc; ++i) l.push_back(Value(std::string(argv[i]))); return Value(l); }
 
 // ---------- standard library (string / list / map / conversion) ----------
-inline Value rt_type(std::vector<Value> a) { const Value& x = a[0]; return Value(x.k == Value::NUM ? "number" : x.k == Value::STR ? "string" : x.k == Value::BOOL ? "boolean" : x.k == Value::MAP ? "map" : "list"); }
+inline Value rt_type(std::vector<Value> a) { const Value& x = a[0];   return Value(x.k == Value::NUM ? "number" : x.k == Value::STR ? "string" : x.k == Value::BOOL ? "boolean" : x.k == Value::FUNC ? "function" : x.k == Value::MAP ? "map" : "list"); }
 inline Value rt_toint(std::vector<Value> a) { return Value((double)(long long)rt_num(a[0])); }
 inline Value rt_tofloat(std::vector<Value> a) { return Value(rt_num(a[0])); }
 inline Value rt_tostr(std::vector<Value> a) { return Value(rt_str(a[0])); }

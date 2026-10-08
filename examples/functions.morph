@@ -1,0 +1,42 @@
+whisper functions — first-class: lambdas, closures, higher-order use.
+
+sovereign apply(f, x) {
+    signal f(x)
+}
+
+sovereign make_adder(n) {          # returns a closure
+    signal fn(x) { signal x + n }
+}
+
+sovereign main() {
+    let dbl = fn(x) { signal x * 2 }
+    print(dbl(21))                 # 42
+    print(apply(dbl, 5))           # 10
+
+    let add10 = make_adder(10)
+    print(add10(5))                # 15
+
+    let fns = [fn(x) { signal x + 1 }, fn(x) { signal x * 10 }]
+    print(fns[0](2) + fns[1](2))   # 22
+
+    print(dbl)                     # <fn>
+    print(type(dbl))               # function
+
+    # capture is BY VALUE (a snapshot at creation)
+    let base = 5
+    let addb = fn(x) { signal x + base }
+    let base = 100
+    print(addb(1))                 # 6  (captured 5, not 100)
+
+    # a closure keeps its own mutable state across calls
+    let counter = 0
+    let inc = fn() { let counter = counter + 1 signal counter }
+    print(inc())                   # 1
+    print(inc())                   # 2
+    print(counter)                 # 0  (outer is unchanged)
+
+    # currying
+    let add = fn(x) { signal fn(y) { signal x + y } }
+    let add5 = add(5)
+    print(add5(3))                 # 8
+}

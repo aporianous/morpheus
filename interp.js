@@ -6,7 +6,7 @@
 
   // ---------- tokenizer ----------
   const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++', '->', '..'];
-  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena','break','continue','for','in','struct']);
+  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena','break','continue','for','in','struct','fn']);
 
   function tokenize(src) {
     const t = [];
@@ -152,6 +152,7 @@
       if (tok.type === 'str') { next(); return { type: 'Str', value: tok.value }; }
       if (tok.type === 'kw' && tok.value === 'true') { next(); return { type: 'Bool', value: true }; }
       if (tok.type === 'kw' && tok.value === 'false') { next(); return { type: 'Bool', value: false }; }
+      if (tok.type === 'kw' && tok.value === 'fn') return lambda();
       if (tok.type === 'kw' && tok.value === 'prophesy') return prophesy();
       if (tok.type === 'kw' && tok.value === 'weave') { next(); return { type: 'Weave', body: block() }; }
       if (tok.type === 'ident') { next(); return { type: 'Ident', name: tok.value }; }
@@ -173,6 +174,9 @@
       }
       return { type: 'Prophesy', body, samples, confidence };
     }
+    function lambda() { next(); eat('('); const params = [];
+      while (!isP(')')) { params.push(next().value); if (isOp(',')) next(); }
+      eat(')'); return { type: 'Lambda', params, body: block() }; }
     // prophesy `with` values are literals; grab them directly
     // (the generic expression() above handles `5000` / `0.95` fine)
     return program();
@@ -201,6 +205,7 @@
         case 'Map': { const m = new Map(); for (const p of node.pairs) { const kk = evalExpr(p.key); m.set(typeof kk === 'string' ? kk : fmt(kk), evalExpr(p.value)); } return m; }
         case 'Slice': { const o = evalExpr(node.obj); const s = node.start ? evalExpr(node.start) : 0; const e = node.end ? evalExpr(node.end) : o.length; return o.slice(s, e); }
         case 'Cond': return truthy(evalExpr(node.cond)) ? evalExpr(node.then) : evalExpr(node.els);
+        case 'Lambda': { const snap = Object.create(null); for (const k in env.vars) snap[k] = env.vars[k]; return { __closure: true, params: node.params, body: node.body, env: snap }; }
         case 'Weave': { const res = []; for (const s of node.body) { const r = execStmt(s); if (r !== undefined) res.push(r); } return res; }
         case 'Prophesy': {
           const vals = [];
@@ -240,6 +245,10 @@
         finally { env.vars = saved; }
       }
       if (callee.type === 'Member') { const o = evalExpr(callee.obj); const fn = o[callee.name]; return fn.apply(o, args); }
+      { const v = evalExpr(callee);
+        if (v && v.__closure) { const saved = env.vars; env.vars = v.env;
+          v.params.forEach((p, i) => { env.vars[p] = args[i]; });
+          try { return execBlockValue(v.body); } catch (e) { if (e[RET]) return e.value; throw e; } finally { env.vars = saved; } } }
       throw new Error('not a function');
     }
     function execStmt(s) {
@@ -301,7 +310,7 @@
         env: (k) => (options.env ? options.env(k) : undefined),
         clock: () => Date.now() / 1000,
         arena_bytes: () => 0,
-        type: (x) => (Array.isArray(x) ? 'list' : (x instanceof Map ? 'map' : typeof x)),
+        type: (x) => (x && x.__closure ? 'function' : Array.isArray(x) ? 'list' : (x instanceof Map ? 'map' : typeof x)),
         int: (x) => Math.trunc(Number(x) || 0), float: (x) => Number(x) || 0, str: (x) => fmt(x),
         floor: Math.floor, ceil: Math.ceil, tan: Math.tan, log: Math.log,
         upper: (s) => String(s).toUpperCase(), lower: (s) => String(s).toLowerCase(), trim: (s) => String(s).trim(),
@@ -337,7 +346,7 @@
       };
       return b;
     }
-    function fmt(v) { if (typeof v === 'number') { if (Number.isInteger(v)) return String(v); let s = v.toFixed(6).replace(/0+$/, '').replace(/\.$/, ''); return s.charAt(0) === '.' ? '0' + s : s; } if (Array.isArray(v)) return '[' + v.map(fmt).join(', ') + ']'; if (v instanceof Map) { const parts = []; for (const k of Array.from(v.keys()).sort()) parts.push(k + ': ' + fmt(v.get(k))); return '{' + parts.join(', ') + '}'; } return String(v); }
+    function fmt(v) { if (v && v.__closure) return '<fn>'; if (typeof v === 'number') { if (Number.isInteger(v)) return String(v); let s = v.toFixed(6).replace(/0+$/, '').replace(/\.$/, ''); return s.charAt(0) === '.' ? '0' + s : s; } if (Array.isArray(v)) return '[' + v.map(fmt).join(', ') + ']'; if (v instanceof Map) { const parts = []; for (const k of Array.from(v.keys()).sort()) parts.push(k + ': ' + fmt(v.get(k))); return '{' + parts.join(', ') + '}'; } return String(v); }
     function round2(x) { return Math.round(x * 1e4) / 1e4; }
 
     try {

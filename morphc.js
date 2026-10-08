@@ -63,6 +63,18 @@ function namesExpr(e, acc) {
     case 'Slice': namesExpr(e.obj, acc); if (e.start) namesExpr(e.start, acc); if (e.end) namesExpr(e.end, acc); break;
     case 'Prophesy': namesIn(e.body, acc); break;
     case 'Weave': namesIn(e.body, acc); break;
+    case 'Lambda': break;
+  }
+}
+function declaredNames(stmts, acc) {
+  for (const s of stmts) switch (s.type) {
+    case 'Let': acc.add(s.name); break;
+    case 'Assign': if (s.target.type === 'Ident') acc.add(s.target.name); break;
+    case 'ForIn': acc.add(s.name); declaredNames(s.body, acc); break;
+    case 'If': declaredNames(s.body, acc); if (s.alt) declaredNames(s.alt, acc); break;
+    case 'While': declaredNames(s.body, acc); break;
+    case 'Heal': declaredNames(s.body, acc); if (s.alt) declaredNames(s.alt, acc); break;
+    case 'Block': case 'Arena': declaredNames(s.body, acc); break;
   }
 }
 function namesStmt(s, acc) {
@@ -104,6 +116,15 @@ function emitExpr(e) {
     case 'Map': { const parts = []; for (const p of e.pairs) { parts.push(emitExpr(p.key)); parts.push(emitExpr(p.value)); } return 'rt_map(std::vector<Value>{' + parts.join(', ') + '})'; }
     case 'Slice': { const o = emitExpr(e.obj); const a = e.start ? '(long long)rt_num(' + emitExpr(e.start) + ')' : '0'; return '([&](){ Value _o = ' + o + '; long long _a = ' + a + '; long long _n = (_o.k == Value::STR ? (long long)_o.s.size() : (long long)_o.l->size()); long long _b = ' + (e.end ? '(long long)rt_num(' + emitExpr(e.end) + ')' : '_n') + '; if (_b < _a) _b = _a; if (_b > _n) _b = _n; if (_o.k == Value::STR) return Value(_o.s.substr(_a, _b - _a)); List _l(_o.l->begin() + _a, _o.l->begin() + _b); return Value(_l); })()'; }
     case 'Cond': return '([&](){ return rt_truthy(' + emitExpr(e.cond) + ') ? (' + emitExpr(e.then) + ') : (' + emitExpr(e.els) + '); })()';
+    case 'Lambda': { const dn = new Set(); declaredNames(e.body, dn); for (const p of e.params) dn.delete(p);
+      const locals = [...dn].filter((n) => !CTX.scope.has(n));
+      const localDecls = locals.map((n) => 'Value v_' + n + ';').join(' ');
+      const binds = e.params.map((p, i) => 'Value v_' + p + ' = (_a.size() > ' + i + ' ? _a[' + i + '] : Value(0.0));').join(' ');
+      const saveM = CTX.mainEntry; CTX.mainEntry = false;
+      const prevScope = CTX.scope; CTX.scope = new Set([...prevScope, ...e.params, ...locals]);
+      const bodyStr = emitBlock(e.body);
+      CTX.scope = prevScope; CTX.mainEntry = saveM;
+      return 'Value(std::make_shared<FnT>([=](std::vector<Value> _a) mutable -> Value {\n' + binds + '\n' + localDecls + '\n' + bodyStr + '\nreturn Value(0.0); }))'; }
     case 'Call': return emitCall(e);
     case 'Prophesy': return emitProphesy(e);
     case 'Weave': return emitWeave(e);
@@ -117,7 +138,7 @@ function emitCall(e) {
     const all = [emitExpr(e.callee.obj)].concat(e.args.map(emitExpr));
     return b.var ? b.c + '(std::vector<Value>{' + all.join(', ') + '})' : b.c + '(' + all.join(', ') + ')';
   }
-  if (e.callee.type !== 'Ident') throw new Error('native backend: only named functions can be called');
+  if (e.callee.type !== 'Ident') return 'rt_call(' + emitExpr(e.callee) + ', std::vector<Value>{' + e.args.map(emitExpr).join(', ') + '})';
   const name = e.callee.name;
   if (CTX.types.has(name)) { const parts = []; CTX.types.get(name).forEach((f, i) => { parts.push('Value(' + esc(f) + ')'); parts.push(emitExpr(e.args[i] || { type: 'Num', value: 0 })); }); return 'rt_map(std::vector<Value>{' + parts.join(', ') + '})'; }
   const ex = CTX.externs.get(name);
@@ -125,7 +146,8 @@ function emitCall(e) {
   if (CTX.typed.has(name)) { const f = CTX.byName.get(name); return cWrap(f.returnType, fnName(name) + '(' + f.paramTypes.map((T, i) => cArg(T, emitExpr(e.args[i]))).join(', ') + ')'); }
   const b = BUILTINS[name];
   if (b) return b.var ? b.c + '(std::vector<Value>{' + e.args.map(emitExpr).join(', ') + '})' : b.c + '(' + e.args.map(emitExpr).join(', ') + ')';
-  return fnName(name) + '(' + e.args.map(emitExpr).join(', ') + ')';
+  if (CTX.byName.has(name)) return fnName(name) + '(' + e.args.map(emitExpr).join(', ') + ')';
+  return 'rt_call(v_' + name + ', std::vector<Value>{' + e.args.map(emitExpr).join(', ') + '})';
 }
 function emitProphesy(e) {
   const n = e.samples | 0 || 10000;
@@ -175,7 +197,9 @@ function emitFunction(f, globals) {
   for (const g of globals) locals.delete(g);
   let code = 'Value ' + fnName(f.name) + '(' + f.params.map((p) => 'Value v_' + p).join(', ') + ') {\n';
   for (const nm of locals) code += '  Value v_' + nm + ';\n';
+  const prev = CTX.scope; CTX.scope = new Set([...globals, ...f.params, ...locals]);
   code += emitBlock(f.body) + '\n  return Value(0.0);\n}\n';
+  CTX.scope = prev;
   return code;
 }
 function signature(f) { return 'Value ' + fnName(f.name) + '(' + f.params.map((p) => 'Value v_' + p).join(', ') + ');\n'; }
@@ -303,7 +327,7 @@ function cWrap(R, call) { if (R === 'void') return '([&](){ ' + call + '; return
 function TValToC(T, code) { return T === 'str' ? code + '.c_str()' : code; }
 
 // ---------- module loading ----------
-const CTX = { externs: new Map(), typed: new Set(), byName: new Map(), types: new Map(), arena: 0 };
+const CTX = { externs: new Map(), typed: new Set(), byName: new Map(), types: new Map(), arena: 0, scope: new Set() };
 function loadModule(absPath, seen, out) {
   const ast = parse(fs.readFileSync(absPath, 'utf8'));
   const dir = path.dirname(absPath);
@@ -351,8 +375,9 @@ function compileToCpp(absPath) {
     if (mainFn.params.length) { locals.delete(mainFn.params[0]); code += '  Value v_' + mainFn.params[0] + ' = rt_args(argc, argv);\n'; }
     for (const nm of locals) code += '  Value v_' + nm + ';\n';
     CTX.mainEntry = true;
+    const prevScope = CTX.scope; CTX.scope = new Set([...globals, ...locals, ...mainFn.params]);
     code += emitBlock(mainFn.body) + '\n';
-    CTX.mainEntry = false;
+    CTX.scope = prevScope; CTX.mainEntry = false;
   } else if (frameFn) {
     code += '  double _tick = 140;\n  for (;;) {\n';
     code += '    Value _st = ' + fnName('frame') + '(rt_key());\n';

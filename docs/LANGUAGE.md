@@ -57,6 +57,27 @@ sovereign fib(n: int) -> int {           # typed → long long fib(long long)
 
 `main(args)` receives the command-line arguments as a list of strings.
 
+## Functions as values (lambdas)
+```
+let dbl = fn(x) { signal x * 2 }
+print(dbl(21))                       # 42
+
+sovereign apply(f, x) { signal f(x) }   # take a function as an argument
+print(apply(dbl, 5))                 # 10
+
+sovereign make_adder(n) { signal fn(x) { signal x + n } }   # return one
+let add10 = make_adder(10)
+print(add10(5))                      # 15
+
+let fs = [fn(x){ signal x + 1 }, fn(x){ signal x * 10 }]
+```
+**Closures.** A lambda captures the variables it uses by **value** (a snapshot
+taken when the lambda is created), so later changes to those outer variables are
+not seen. A lambda keeps its **own** mutable copies across calls: a counter
+lambda that reassigns a captured variable keeps counting, while the outer
+variable is unchanged. A value that is a function has `type(f) == "function"`
+and prints as `<fn>`. Calling a non-function is a runtime error.
+
 ## Collections
 ```
 let xs = [5, 3, 9]
