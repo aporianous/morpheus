@@ -1,6 +1,6 @@
 whisper ============================================================
 whisper  MORPHORIA - an Aporia Nous game. Learn to code by playing.
-whisper  Lives, combo multipliers, ranks, a mascot, a winding path of units,
+whisper  Combo multipliers, ranks, a mascot, a winding path of units,
 whisper  and a final build you pass with real tests.
 whisper  Self-paced, no timers. One small idea per unit.
 whisper  Run:  node morph.js play learn/morphoria.morph
@@ -10,6 +10,13 @@ sovereign tier_xp(t) {
     when t == "Expert" { signal 20 }
     when t == "Hard" { signal 15 }
     signal 10
+}
+
+sovereign tier_index(t) {
+    when t == "Expert" { signal 3 }
+    when t == "Hard" { signal 2 }
+    when t == "Medium" { signal 1 }
+    signal 0
 }
 
 sovereign rank(xp) {
@@ -160,12 +167,15 @@ sovereign save() {
 let xp = 0
 let streak = 0
 let best = 0
-let hearts = 3
 let combo = 0
 let last_stars = 0
 let cleared = []
+let ever_wrong = {}
+let ustars = []
 let i = 0
 loop i < len(units) { let cleared = push(cleared, 0) let i = i + 1 }
+let si = 0
+loop si < len(units) { let ustars = push(ustars, 0) let si = si + 1 }
 
 let save_str = ""
 heal { save_str = read_file("learn/morphoria_save.txt") } dream { save_str = "" }
@@ -230,22 +240,6 @@ sovereign unlocked(n) {
     signal cleared[n - 1] == 1
 }
 
-sovereign refill_and_return() {
-    let hearts = 3
-    let combo = 0
-    save()
-}
-
-sovereign hearts_str() {
-    let s = ""
-    let k = 0
-    loop k < 3 {
-        when k < hearts { let s = s ++ "O " } dream { let s = s ++ ". " }
-        let k = k + 1
-    }
-    signal s
-}
-
 sovereign bar(done, total, width) {
     let fill = 0
     when total > 0 { let fill = (done * width) / total }
@@ -263,7 +257,7 @@ sovereign praise() {
 }
 
 sovereign hud() {
-    print("Lives " ++ hearts_str() ++ "  XP " ++ str(xp) ++ "  " ++ rank(xp) ++ "  " ++ units[u]["name"])
+    print("XP " ++ str(xp) ++ "  " ++ rank(xp) ++ "  " ++ units[u]["name"])
 }
 
 sovereign starter_text() {
@@ -292,7 +286,7 @@ sovereign draw_title() {
     print("")
     print("                 (o_o)   Morphy says hi!")
     print("")
-    print("   Short lessons. Quick quests. Ranks, combos, lives.")
+    print("   Short lessons. Quick quests. Ranks and combos.")
     print("   Finish with a build you pass with real tests.")
     print("")
     print("               PRESS SPACE to adventure")
@@ -370,22 +364,9 @@ sovereign draw_celebrate() {
     print("")
     print("           (^o^)   Morphy is dancing!")
     print("")
-    print("        XP " ++ str(xp) ++ "   rank " ++ rank(xp) ++ "   lives refilled")
+    print("        XP " ++ str(xp) ++ "   rank " ++ rank(xp))
     print("")
     print("ENTER to continue")
-}
-
-sovereign draw_gameover() {
-    clear()
-    print("")
-    print("              (x_x)")
-    print("")
-    print("         Out of lives!")
-    print("")
-    print("   No problem - Morphy believes in you.")
-    print("   Press R to refill your lives and try again.")
-    print("")
-    print("R refill      Q quit")
 }
 
 sovereign draw_workspace() {
@@ -419,14 +400,53 @@ sovereign draw_help() {
     print("  ENTER     play / next")
     print("  1 2 3     answer a question")
     print("  B         go back")
-    print("  R         refill lives (if you run out)")
     print("  Q         quit")
     print("")
     print("  Clear each unit to unlock the next.")
     print("  Right answers build a COMBO for bonus XP.")
-    print("  Wrong answers cost a life. Nothing is timed.")
+    print("  Wrong answers just reset your combo. Nothing is timed.")
     print("")
     print("ANY KEY to go back")
+}
+
+sovereign weakest_of(unit) {
+    let cs = concepts_of(unit)
+    let worst = cs[0]
+    let i = 0
+    loop i < len(cs) {
+        when strength_of(cs[i]) < strength_of(worst) { let worst = cs[i] }
+        let i = i + 1
+    }
+    signal worst
+}
+
+sovereign draw_gate_ready() {
+    clear()
+    print(units[u]["name"] ++ " — cleared!   stars: " ++ stars_str(ustars[u]))
+    print("")
+    print("   (^_^)  Morphy: you've got this.")
+    print("")
+    print("  P practice more      ENTER continue")
+    print("")
+    print("B back   Q quit")
+}
+
+sovereign draw_gate_shaky() {
+    clear()
+    print(units[u]["name"] ++ " — almost!   stars: " ++ stars_str(ustars[u]))
+    print("")
+    print("   (o_o)  Morphy: let's shore up " ++ weakest_of(units[u]) ++ ".")
+    print("")
+    print("  R quick review       ENTER continue anyway")
+    print("")
+    print("B back   Q quit")
+}
+
+sovereign draw_review() {
+    clear()
+    print("REVIEW (coming soon)")
+    print("")
+    print("ENTER to go back")
 }
 
 sovereign draw() {
@@ -435,14 +455,15 @@ sovereign draw() {
     dream when screen == "help" { draw_help() }
     dream when screen == "ex" { draw_ex() }
     dream when screen == "fb" { draw_fb() }
+    dream when screen == "gate_ready" { draw_gate_ready() }
+    dream when screen == "gate_shaky" { draw_gate_shaky() }
+    dream when screen == "review" { draw_review() }
     dream when screen == "celebrate" { draw_celebrate() }
-    dream when screen == "gameover" { draw_gameover() }
     dream when screen == "workspace" { draw_workspace() }
 }
 
 sovereign frame(k) {
     when k == "q" { signal "over" }
-    when k == "r" { refill_and_return() let screen = "map" let msg = "Lives refilled. Go get it!" signal "" }
 
     when screen == "title" {
         when (k == " ") or (k == "\n") { let screen = "map" }
@@ -470,20 +491,25 @@ sovereign frame(k) {
         when k == "b" { let screen = "map" }
         when (k == "1") or (k == "2") or (k == "3") {
             let ex = units[u]["ex"][e]
-            when int(k) == ex["ans"] {
+            let c = ex["concept"]
+            let key = c ++ str(e)
+            let first_try = not has(ever_wrong, key)
+            let correct = int(k) == ex["ans"]
+            when not correct { let ever_wrong = put(ever_wrong, key, 1) }
+            set_strength(c, strength_update(strength_of(c), correct, tier_index(ex["tier"]), first_try))
+            when correct {
                 let combo = combo + 1
                 let bonus = 0
                 when combo >= 2 { let bonus = combo * 2 }
                 let xp = xp + tier_xp(ex["tier"]) + bonus
                 when combo > best { let best = combo }
                 let fbok = true
-                let screen = "fb"
             } dream {
                 let combo = 0
-                let hearts = hearts - 1
                 let fbok = false
-                when hearts <= 0 { let screen = "gameover" } dream { let screen = "fb" }
+                when not contains(shaky, c) { let shaky = push(shaky, c) }
             }
+            let screen = "fb"
             save()
         }
     }
@@ -492,29 +518,57 @@ sovereign frame(k) {
         when (k == "\n") or (k == " ") {
             let e = e + 1
             when e >= len(units[u]["ex"]) {
-                let last_stars = hearts
-                let cleared = set(cleared, u, 1)
-                let xp = xp + 25
-                let hearts = 3
+                let vals = readiness_of(units[u])
+                let stars = stars_of(vals)
+                let ustars = set(ustars, u, stars)
                 save()
-                when u >= len(units) - 1 {
-                    let screen = "workspace"
-                    let wrote = false
-                } dream {
-                    let u = u + 1
-                    let mi = u
-                    let screen = "celebrate"
-                }
+                when is_ready(vals) { let screen = "gate_ready" } dream { let screen = "gate_shaky" }
             } dream {
                 let screen = "ex"
             }
         }
     }
+    dream when screen == "gate_ready" {
+        when k == "p" { let screen = "review" }
+        when (k == "\n") or (k == " ") {
+            let last_stars = ustars[u]
+            let cleared = set(cleared, u, 1)
+            let xp = xp + 25
+            when u >= len(units) - 1 {
+                let screen = "workspace"
+                let wrote = false
+            } dream {
+                let u = u + 1
+                let mi = u
+                let screen = "celebrate"
+            }
+            save()
+        }
+        when k == "b" { let screen = "fb" }
+    }
+    dream when screen == "gate_shaky" {
+        when k == "r" { let screen = "review" }
+        when (k == "\n") or (k == " ") {
+            let last_stars = ustars[u]
+            let cleared = set(cleared, u, 1)
+            let xp = xp + 25
+            when u >= len(units) - 1 {
+                let screen = "workspace"
+                let wrote = false
+            } dream {
+                let u = u + 1
+                let mi = u
+                let screen = "celebrate"
+            }
+            save()
+        }
+        when k == "b" { let screen = "fb" }
+    }
+    dream when screen == "review" {
+        when (k == "\n") or (k == " ") { let screen = "gate_ready" }
+    }
     dream when screen == "celebrate" {
         when (k == "\n") or (k == " ") { let screen = "map" }
-    }
-    dream when screen == "gameover" {
-        when k == "r" { refill_and_return() let screen = "map" let msg = "Lives refilled. Go get it!" }
     }
     dream when screen == "workspace" {
         when not wrote { write_starter() let wrote = true }
