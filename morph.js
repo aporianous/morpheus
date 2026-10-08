@@ -8,12 +8,29 @@ const path = require('path');
 const { runMorpheus } = require('./interp.js');
 
 const [cmd, file, ...rest] = process.argv.slice(2);
-if ((cmd !== 'run' && cmd !== 'play') || !file) {
-  process.stdout.write('Usage:\n  node morph.js run  <file.morph> [args...]\n  node morph.js play <file.morph>\n');
+if ((cmd !== 'run' && cmd !== 'play' && cmd !== 'build') || !file) {
+  process.stdout.write('Usage:\n  node morph.js run   <file.morph> [args...]\n  node morph.js play  <file.morph>\n  node morph.js build <file.morph> [-o out.exe]   # compile to a native binary\n');
   process.exit(2);
 }
 const abs = path.resolve(file);
 const baseDir = path.dirname(abs);
+
+if (cmd === 'build') {
+  const { compileToCpp } = require('./morphc.js');
+  const cp = require('child_process');
+  const cppPath = abs.replace(/\.morph$/i, '') + '.cpp';
+  try { fs.writeFileSync(cppPath, compileToCpp(abs)); }
+  catch (e) { process.stderr.write('compile error: ' + (e && e.message || e) + '\n'); process.exit(1); }
+  const outExe = rest[0] ? path.resolve(rest[0]) : abs.replace(/\.morph$/i, '') + '.exe';
+  const env = Object.assign({}, process.env);
+  env.PATH = 'C:\\Perseus\\tools\\mingw64\\bin;' + (env.PATH || '');
+  process.stdout.write('C++: ' + cppPath + '\n');
+  const r = cp.spawnSync('g++', ['-std=c++17', '-O2', '-static', cppPath, '-o', outExe], { stdio: 'inherit', env });
+  if (r.error) { process.stderr.write('could not run g++: ' + r.error.message + '\n'); process.exit(1); }
+  if (r.status !== 0) { process.stderr.write('build failed\n'); process.exit(1); }
+  process.stdout.write('Built ' + outExe + '\n');
+  process.exit(0);
+}
 
 let lastKey = '';
 const host = {

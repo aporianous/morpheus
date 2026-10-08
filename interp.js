@@ -302,5 +302,7 @@
   }
 
   root.runMorpheus = runMorpheus;
-  if (typeof module !== 'undefined' && module.exports) module.exports = { runMorpheus };
+  root.parse = parse;
+  root.tokenize = tokenize;
+  if (typeof module !== 'undefined' && module.exports) module.exports = { runMorpheus, parse, tokenize };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

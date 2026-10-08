@@ -1,0 +1,8 @@
+whisper words — native build with `import`.
+
+import "text.morph"
+
+sovereign main() {
+    print(count_words("one two three"))
+    print(count_lines("a\nb\nc"))
+}

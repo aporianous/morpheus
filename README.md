@@ -30,6 +30,17 @@ open; a separate production runtime is private.
   node morph.js play examples/snake.morph                       # a real-time game
   ```
 
+## Native binaries
+Morpheus compiles to a **standalone native executable** — no interpreter, no VM:
+```
+node morph.js build examples/fib.morph      # Morpheus → examples/fib.cpp → examples/fib.exe
+./examples/fib.exe
+```
+It emits C++ (inlining the small runtime in `runtime/morph_rt.h`) and compiles it
+with `g++ -O2 -static`, so the binary runs anywhere. Recursion, `prophesy`,
+lists and `import` all compile. That's a real systems-language path for the
+supported subset.
+
 ## Build apps
 Morpheus is enough to write real programs: `import` modules, file I/O
 (`read_file` / `write_file`), `argv`, and — for games — a host-driven frame
@@ -49,7 +60,9 @@ runMorpheus(src, { builtins: { double: (x) => x * 2 } });
 | Path | What |
 |---|---|
 | `interp.js` | reference interpreter (lexer → parser → evaluator) + extension hook |
-| `morph.js` | CLI — `run` a program, `play` a game |
+| `morphc.js` | native backend — compiles Morpheus → C++ |
+| `runtime/morph_rt.h` | the native runtime, inlined into each build |
+| `morph.js` | CLI — `run` a program, `play` a game, `build` a native binary |
 | `index.html` | interactive tutorial + live playground |
 | `stdlib/` | `.morph` standard library |
 | `docs/` | spec, keywords, tutorial, API reference, extending |

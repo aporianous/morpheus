@@ -1,4 +1,7 @@
 # example app output
 summary.txt
+# native build artifacts
+*.exe
+examples/*.cpp
 # deps
 node_modules/
