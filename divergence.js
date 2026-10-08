@@ -22,6 +22,8 @@ const edge = {
   'ternary': `sovereign main(){ print(1 < 2 ? "a" : "b") print(1 > 2 ? "a" : "b") print(len([1]) == 1 ? 100 : 0) }`,
   'slice': `sovereign main(){ let a=[0,1,2,3,4,5] print(a[1:4]) print(a[2:]) print(a[:3]) print(a[:]) }`,
   'map-mut': `sovereign main(){ let m = { "a": 1 } put(m, "b", 2) print(m) print(m.has("b")) print(m.get("a")) print(m.get("z", -1)) del(m, "a") print(m) print(m.keys()) }`,
+  'global-rebind': `let h = 0\nsovereign set_h() { let h = 7 }\nsovereign add() { let h = h + 1 }\nsovereign main(){ set_h() print(h) add() add() print(h) }`,
+  'global-assign': `let g = 1\nsovereign bump() { g = g + 10 }\nsovereign main(){ bump() bump() print(g) }`,
   'bool-eq': `sovereign main(){ print(true) print(false) print(1 == 1) print(1 != 2) print(2 > 1) print(not true) print(true and false) print(true or false) }`,
   'division': `sovereign main(){ print(1/3) print(2/3*3) print(10 % 3) print(-7 % 3) print(2 ** 10) }`,
   'recurse': `sovereign fib(n){ when n < 2 { signal n } signal fib(n-1)+fib(n-2) } sovereign main(){ print(fib(15)) }`,

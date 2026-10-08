@@ -188,6 +188,7 @@
     options = options || {};
     const out = [];
     const env = { vars: Object.create(null), funcs: Object.create(null), types: Object.create(null), out, file: options.basePath || '<main>' };
+    const root = env.vars; // module-global scope; a function-body write to an existing global rebinds HERE (parity with native)
     const loaded = new Set();
     const g = Object.assign(builtins(env), options.builtins || {});
 
@@ -256,9 +257,9 @@
         case 'FuncDecl': env.funcs[s.name] = { params: s.params, body: s.body }; return undefined;
         case 'Extern': return undefined;
         case 'TypeDecl': env.types[s.name] = s.fields; return undefined;
-        case 'Let': env.vars[s.name] = evalExpr(s.expr); return undefined;
+        case 'Let': { const v = evalExpr(s.expr); if (!Object.prototype.hasOwnProperty.call(env.vars, s.name) && (s.name in root)) root[s.name] = v; else env.vars[s.name] = v; return undefined; }
         case 'Assign': { const tg = s.target, v = evalExpr(s.expr);
-          if (tg.type === 'Ident') env.vars[tg.name] = v;
+          if (tg.type === 'Ident') { if (!Object.prototype.hasOwnProperty.call(env.vars, tg.name) && (tg.name in root)) root[tg.name] = v; else env.vars[tg.name] = v; }
           else if (tg.type === 'Member') { const o = evalExpr(tg.obj); if (o instanceof Map) o.set(tg.name, v); else o[tg.name] = v; }
           else { const o = evalExpr(tg.obj), i = evalExpr(tg.idx); if (o instanceof Map) o.set(i, v); else o[i] = v; }
           return v; }
