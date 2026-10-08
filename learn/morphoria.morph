@@ -88,7 +88,72 @@ let units = [
     ] }
 ]
 
-let save_path = "learn/morphoria_save.txt"
+import "morphoria_core.morph"
+
+let strength = {}
+let last_seen = {}
+let shaky = []
+let badges = []
+
+sovereign concepts_of(unit) {
+    let cs = []
+    let i = 0
+    loop i < len(unit["ex"]) {
+        let c = unit["ex"][i]["concept"]
+        when not contains(cs, c) { let cs = push(cs, c) }
+        let i = i + 1
+    }
+    signal cs
+}
+
+sovereign all_concepts() {
+    let cs = []
+    let i = 0
+    loop i < len(units) {
+        let j = 0
+        loop j < len(units[i]["ex"]) {
+            let c = units[i]["ex"][j]["concept"]
+            when not contains(cs, c) { let cs = push(cs, c) }
+            let j = j + 1
+        }
+        let i = i + 1
+    }
+    signal cs
+}
+
+sovereign strength_of(c) {
+    when has(strength, c) { signal strength[c] }
+    signal 0.5
+}
+
+sovereign set_strength(c, s) {
+    let strength = put(strength, c, s)
+}
+
+sovereign readiness_of(unit) {
+    let cs = concepts_of(unit)
+    let vals = []
+    let i = 0
+    loop i < len(cs) { let vals = push(vals, strength_of(cs[i])) let i = i + 1 }
+    signal vals
+}
+
+sovereign save() {
+    let bs = join(badges, ",")
+    let cs = all_concepts()
+    let parts = []
+    let i = 0
+    loop i < len(cs) {
+        let c = cs[i]
+        let seen = 0
+        when has(last_seen, c) { let seen = last_seen[c] }
+        let parts = push(parts, c ++ ":" ++ str(strength_of(c)) ++ ":" ++ str(seen))
+        let i = i + 1
+    }
+    let line = str(xp) ++ "|" ++ str(best) ++ "|" ++ bs ++ "|" ++ join(parts, ";")
+    heal { write_file("learn/morphoria_save.txt", line) } dream { }
+}
+
 let xp = 0
 let streak = 0
 let best = 0
@@ -100,18 +165,39 @@ let i = 0
 loop i < len(units) { let cleared = push(cleared, 0) let i = i + 1 }
 
 let save_str = ""
-heal { save_str = read_file(save_path) } dream { save_str = "" }
+heal { save_str = read_file("learn/morphoria_save.txt") } dream { save_str = "" }
 when len(save_str) > 0 {
-    let parts = split(save_str, ",")
-    when len(parts) >= 2 {
-        let xp = int(parts[0])
-        let best = int(parts[1])
-        let j = 2
-        loop (j < len(parts)) and (j - 2 < len(cleared)) {
-            let cleared = set(cleared, j - 2, int(parts[j]))
-            let j = j + 1
+    when contains(save_str, "|") {
+        let top = split(trim(save_str), "|")
+        when len(top) >= 1 { let xp = int(top[0]) }
+        when len(top) >= 2 { let best = int(top[1]) }
+        when (len(top) >= 3) and (len(top[2]) > 0) { let badges = split(top[2], ",") }
+        when len(top) >= 4 {
+            let recs = split(top[3], ";")
+            let r = 0
+            loop r < len(recs) {
+                let f = split(recs[r], ":")
+                when len(f) == 3 {
+                    let strength = put(strength, f[0], float(f[1]))
+                    let last_seen = put(last_seen, f[0], float(f[2]))
+                }
+                let r = r + 1
+            }
         }
+    } dream {
+        let legacy = split(trim(save_str), ",")
+        when len(legacy) >= 1 { let xp = int(legacy[0]) }
     }
+}
+
+let di = 0
+let dcs = all_concepts()
+loop di < len(dcs) {
+    let c = dcs[di]
+    let seen = 0
+    when has(last_seen, c) { let seen = last_seen[c] }
+    set_strength(c, apply_decay(strength_of(c), seen))
+    let di = di + 1
 }
 
 let screen = "title"
@@ -125,13 +211,6 @@ let wrote = false
 sovereign unlocked(n) {
     when n == 0 { signal true }
     signal cleared[n - 1] == 1
-}
-
-sovereign save() {
-    let s = str(xp) ++ "," ++ str(best)
-    let k = 0
-    loop k < len(cleared) { let s = s ++ "," ++ str(cleared[k]) let k = k + 1 }
-    heal { write_file(save_path, s) } dream { }
 }
 
 sovereign refill_and_return() {
