@@ -131,6 +131,11 @@ print(revenue)          # a conservative / typical estimate
 ## Standard library
 Conversions: `type int float str`
 Math: `abs sqrt pow sin cos exp tan log floor ceil round min max random_int random_uniform random_norm`
+Nondeterministic / host builtins (`random_int`, `random_uniform`, `random_norm`,
+`rand`, `clock`, `argv`, `env`, `input`, `clear`, `sleep`, `key`) are
+environment-provided and are not required to produce identical values across the
+two backends.
+
 Sequences: `len range sum min_of max_of sort reverse contains index_of`
 Strings: `upper lower trim split join substr replace starts_with ends_with repeat`
 Lists: `push pop shift unshift insert remove set reverse`
