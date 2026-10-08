@@ -35,8 +35,9 @@ node morph.js play learn/morphoria.morph
 | `Q` | quit |
 
 Each chapter shows **stars** (up to three) for how well you know its ideas, and you
-earn **badges** for milestones — clearing your first chapter, a 5-answer combo, an
-all-correct review, reaching a new rank, and beating a Boss Review. Progress (XP,
+earn **badges** for milestones — clearing your first chapter, a 5-answer combo, a
+three-star chapter, coming back after a shaky chapter, reaching a new rank, and
+beating a Boss Review. Progress (XP,
 badges, stars, and cleared chapters) is saved to `learn/morphoria_save.txt`
 between sessions.
 
