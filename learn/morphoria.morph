@@ -237,6 +237,8 @@ let wrote = false
 let rev_items = []
 let ri = 0
 let solved_review = {}
+let rev_all = 1
+let rev_is_boss = 0
 
 sovereign unlocked(n) {
     when n == 0 { signal true }
@@ -259,8 +261,18 @@ sovereign praise() {
     signal "Nice!"
 }
 
+sovereign has_badge(bs, name) {
+    for b in bs { when b == name { signal true } }
+    signal false
+}
+
+sovereign award(bs, name) {
+    when has_badge(bs, name) { signal bs }
+    signal push(bs, name)
+}
+
 sovereign hud() {
-    print("XP " ++ str(xp) ++ "  " ++ rank(xp) ++ "  " ++ units[u]["name"])
+    print("XP " ++ str(xp) ++ "  " ++ rank(xp) ++ "  " ++ units[u]["name"] ++ "  · " ++ str(len(badges)) ++ " badges")
 }
 
 sovereign starter_text() {
@@ -369,6 +381,8 @@ sovereign draw_celebrate() {
     print("")
     print("        XP " ++ str(xp) ++ "   rank " ++ rank(xp))
     print("")
+    when len(badges) == 0 { print("        badges: none yet") } dream { print("        badges: " ++ join(badges, ", ")) }
+    print("")
     print("ENTER to continue")
 }
 
@@ -391,6 +405,14 @@ sovereign draw_workspace() {
     print("----------------------------------------------------------")
     print(starter_text())
     print("----------------------------------------------------------")
+    print("Your badges:")
+    when len(badges) == 0 {
+        print("  No badges yet.")
+    } dream {
+        let bi = 0
+        loop bi < len(badges) { print("  * " ++ badges[bi]) let bi = bi + 1 }
+    }
+    print("")
     when len(msg) > 0 { print(msg) }
     print("C rewrite   M back   Q quit")
 }
@@ -481,6 +503,84 @@ sovereign build_review(unit) {
     signal items
 }
 
+sovereign concepts_of_many(unit_list) {
+    let out = []
+    for un in unit_list {
+        for ex in un["ex"] { let out = push(out, ex["concept"]) }
+    }
+    signal out
+}
+
+sovereign find_ex_many(unit_list, c) {
+    let found = unit_list[0]["ex"][0]
+    for un in unit_list {
+        for ex in un["ex"] {
+            when ex["concept"] == c { let found = ex }
+        }
+    }
+    signal found
+}
+
+whisper generic buckets over any concept-id list (read-only).
+sovereign weak_of(cs) {
+    let out = []
+    let i = 0
+    loop i < len(cs) {
+        when strength_of(cs[i]) < 0.6 { let out = push(out, cs[i]) }
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign mid_of(cs) {
+    let out = []
+    let i = 0
+    loop i < len(cs) {
+        let s = strength_of(cs[i])
+        when (s >= 0.6) and (s < 0.8) { let out = push(out, cs[i]) }
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign strong_of(cs) {
+    let out = []
+    let i = 0
+    loop i < len(cs) {
+        when strength_of(cs[i]) >= 0.8 { let out = push(out, cs[i]) }
+        let i = i + 1
+    }
+    signal out
+}
+
+sovereign last_units(u) {
+    let out = []
+    let start = u - 2
+    when start < 0 { let start = 0 }
+    let i = start
+    loop i <= u { let out = push(out, units[i]) let i = i + 1 }
+    signal out
+}
+
+sovereign build_boss(unit_list) {
+    let cs = concepts_of_many(unit_list)
+    let picked = pick_review(weak_of(cs), mid_of(cs), strong_of(cs))
+    let i = 0
+    loop (i < len(cs)) and (len(picked) < 6) {
+        when not contains(picked, cs[i]) { let picked = push(picked, cs[i]) }
+        let i = i + 1
+    }
+    let items = []
+    let j = 0
+    loop j < len(picked) {
+        let ex = find_ex_many(unit_list, picked[j])
+        let item = { "concept": picked[j], "tier": ex["tier"], "q": ex["q"], "code": ex["code"], "opts": ex["opts"], "ans": ex["ans"] }
+        let items = push(items, item)
+        let j = j + 1
+    }
+    signal items
+}
+
 sovereign draw_gate_ready() {
     clear()
     print(units[u]["name"] ++ " — cleared!   stars: " ++ stars_str(ustars[u]))
@@ -505,7 +605,11 @@ sovereign draw_gate_shaky() {
 
 sovereign draw_review() {
     clear()
-    print("Quick review — " ++ units[u]["name"] ++ "   (" ++ str(ri + 1) ++ "/" ++ str(len(rev_items)) ++ ")")
+    when rev_is_boss == 1 {
+        print("Boss review — " ++ units[u]["name"] ++ "   (" ++ str(ri + 1) ++ "/" ++ str(len(rev_items)) ++ ")")
+    } dream {
+        print("Quick review — " ++ units[u]["name"] ++ "   (" ++ str(ri + 1) ++ "/" ++ str(len(rev_items)) ++ ")")
+    }
     print("")
     let it = rev_items[ri]
     print(it["q"])
@@ -573,6 +677,7 @@ sovereign frame(k) {
             let first_try = not has(ever_wrong, key)
             let correct = int(k) == ex["ans"]
             when not correct { let ever_wrong = put(ever_wrong, key, 1) }
+            let pre_str = strength_of(c)
             set_strength(c, strength_update(strength_of(c), correct, tier_index(ex["tier"]), first_try))
             when correct {
                 let combo = combo + 1
@@ -581,6 +686,9 @@ sovereign frame(k) {
                 let xp = xp + tier_xp(ex["tier"]) + bonus
                 when combo > best { let best = combo }
                 let fbok = true
+                let badges = award(badges, "First Steps")
+                when combo >= 5 { let badges = award(badges, "Combo x5") }
+                when pre_str < 0.4 { let badges = award(badges, "Comeback") }
             } dream {
                 let combo = 0
                 let fbok = false
@@ -611,9 +719,17 @@ sovereign frame(k) {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
             let xp = xp + 25
+            when ustars[u] == 0 { let badges = award(badges, "Shapeshifter") }
             when u >= len(units) - 1 {
                 let screen = "workspace"
                 let wrote = false
+            } dream when ((u + 1) % 3) == 0 {
+                let rev_items = build_boss(last_units(u))
+                let ri = 0
+                let solved_review = {}
+                let rev_all = 1
+                let rev_is_boss = 1
+                let screen = "review"
             } dream {
                 let u = u + 1
                 let mi = u
@@ -629,9 +745,17 @@ sovereign frame(k) {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
             let xp = xp + 25
+            when ustars[u] == 0 { let badges = award(badges, "Shapeshifter") }
             when u >= len(units) - 1 {
                 let screen = "workspace"
                 let wrote = false
+            } dream when ((u + 1) % 3) == 0 {
+                let rev_items = build_boss(last_units(u))
+                let ri = 0
+                let solved_review = {}
+                let rev_all = 1
+                let rev_is_boss = 1
+                let screen = "review"
             } dream {
                 let u = u + 1
                 let mi = u
@@ -645,6 +769,8 @@ sovereign frame(k) {
         let rev_items = build_review(units[u])
         let ri = 0
         let solved_review = {}
+        let rev_all = 1
+        let rev_is_boss = 0
         let screen = "review"
     }
     dream when screen == "review" {
@@ -654,13 +780,21 @@ sovereign frame(k) {
             let c = it["concept"]
             let key = "rev:" ++ c ++ str(ri)
             let first_try = not has(solved_review, key)
+            let pre_str = strength_of(c)
             when not correct { let solved_review = put(solved_review, key, 1) }
             set_strength(c, strength_update(strength_of(c), correct, tier_index(it["tier"]), first_try))
+            when correct {
+                let badges = award(badges, "First Steps")
+                when pre_str < 0.4 { let badges = award(badges, "Comeback") }
+            } dream {
+                let rev_all = 0
+            }
             let ri = ri + 1
             let screen = "review"
             when ri >= len(rev_items) {
                 let vals = readiness_of(units[u])
                 let ustars = set(ustars, u, stars_of(vals))
+                when rev_all == 1 { let badges = award(badges, "Full Sweep") }
                 save()
                 let screen = "review_done"
             }
@@ -668,8 +802,18 @@ sovereign frame(k) {
     }
     dream when screen == "review_done" {
         when (k == "\n") or (k == " ") {
-            let vals = readiness_of(units[u])
-            when is_ready(vals) { let screen = "gate_ready" } dream { let screen = "gate_shaky" }
+            when rev_is_boss == 1 {
+                let badges = award(badges, "Boss Slayer")
+                let xp = xp + 50
+                let rev_is_boss = 0
+                let u = u + 1
+                let mi = u
+                let screen = "celebrate"
+                save()
+            } dream {
+                let vals = readiness_of(units[u])
+                when is_ready(vals) { let screen = "gate_ready" } dream { let screen = "gate_shaky" }
+            }
         }
     }
     dream when screen == "celebrate" {

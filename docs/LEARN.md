@@ -4,6 +4,21 @@
 fun, self-paced units. Earn XP, build combos, keep your lives, climb the ranks,
 and finish by **building a real app that is graded by real tests before it runs**.
 
+## Morphoria
+
+Morphoria is a free, self-paced game for learning the Morpheus language. Play at
+your own speed — there are no timers and nothing to lose.
+
+**How a chapter works.** Each chapter teaches one small idea. You answer a
+question, get friendly feedback right away, then face a quick readiness check. If
+a topic still feels shaky, Morphy offers an optional short review of just the
+ideas you are least sure about, so you can shore them up before moving on.
+
+**Your progress is saved on your own device**, so you can close the game and pick
+up right where you left off.
+
+Questions or help? Reach us any time at support@aporianous.com.
+
 ## Play the course
 
 ```
