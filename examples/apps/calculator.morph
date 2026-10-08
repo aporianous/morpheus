@@ -1,0 +1,70 @@
+whisper calculator — a keypad app you can extend.
+whisper Run:  node morph.js play examples/apps/calculator.morph
+whisper Keys: 0-9 digits   + - * / operator   = equals   C clear   Q quit
+
+let disp = "0"
+let acc = 0
+let op = ""
+let fresh = true
+let note = ""
+
+sovereign is_digit(k) {
+    signal (k == "0") or (k == "1") or (k == "2") or (k == "3") or (k == "4") or (k == "5") or (k == "6") or (k == "7") or (k == "8") or (k == "9")
+}
+
+sovereign is_op(k) {
+    signal (k == "+") or (k == "-") or (k == "*") or (k == "/")
+}
+
+sovereign compute(a, b, o) {
+    when o == "+" { signal a + b }
+    when o == "-" { signal a - b }
+    when o == "*" { signal a * b }
+    when o == "/" {
+        when b == 0 { signal 0 }
+        signal a / b
+    }
+    signal b
+}
+
+sovereign draw() {
+    clear()
+    print("+-----------------------------+")
+    print("|          CALCULATOR          |")
+    print("+-----------------------------+")
+    print("| " ++ note)
+    print("| " ++ disp)
+    print("+-----------------------------+")
+    print("| 7 8 9 /    4 5 6 *")
+    print("| 1 2 3 -    0 = +")
+    print("+-----------------------------+")
+    print("C clear     Q quit")
+    signal ""
+}
+
+sovereign frame(k) {
+    when k == "q" { signal "over" }
+    when k == "c" {
+        let disp = "0" let acc = 0 let op = "" let fresh = true let note = ""
+    }
+    dream when is_digit(k) {
+        when fresh { let disp = k let fresh = false }
+        dream { let disp = disp ++ k }
+    }
+    dream when is_op(k) {
+        let acc = float(disp)
+        let op = k
+        let fresh = true
+        let note = disp ++ " " ++ op
+    }
+    dream when k == "=" {
+        when len(op) > 0 {
+            let acc = compute(acc, float(disp), op)
+            let disp = str(acc)
+            let op = ""
+            let fresh = true
+            let note = ""
+        }
+    }
+    signal draw()
+}

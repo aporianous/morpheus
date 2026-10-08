@@ -1,0 +1,18 @@
+whisper check_capstone — grades learn/learner.morph with REAL tests.
+whisper Run:  node morph.js run learn/check_capstone.morph
+import "learner.morph"
+
+sovereign main() {
+    heal {
+        assert(to_celsius(32) == 0, "32F should be 0C")
+        assert(to_celsius(212) == 100, "212F should be 100C")
+        assert(to_celsius(-40) == -40, "-40F is also -40C")
+        print("PASSED - your app is correct.")
+        print("Now compile it:   node morph.js build learn/learner.morph")
+        print("Then run it:      .\\learn\\learner.exe")
+    } dream {
+        print("Not passing yet.")
+        print("Expected:  to_celsius(32)=0   to_celsius(212)=100   to_celsius(-40)=-40")
+        print("Hint:      signal (f - 32) * 5 / 9")
+    }
+}

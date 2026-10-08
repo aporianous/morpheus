@@ -1,0 +1,317 @@
+whisper ============================================================
+whisper  MORPHEUS DUO — a Duolingo-style course, written IN Morpheus.
+whisper  Run:  node morph.js play learn/morpheus_duo.morph
+whisper  Keys: W/S move · ENTER select · 1-3 answer · H help · Q quit · R reset
+whisper ============================================================
+
+# ---- course content: units -> exercises ----------------------------------
+let units = [
+    { "name": "Unit 1 - Values", "ex": [
+        { "q": "What does this print?", "code": "print(2 + 3 * 4)", "opts": ["14", "20", "24"], "ans": 1,
+          "why": "Multiplication binds tighter than +, so 3*4=12, then 2+12=14." },
+        { "q": "What is the type of \"hi\"?", "code": "print(type(\"hi\"))", "opts": ["string", "text", "char"], "ans": 1,
+          "why": "Morpheus reports text as `string`." },
+        { "q": "What does this print?", "code": "print(10 / 4)", "opts": ["2", "2.5", "2.500001"], "ans": 2,
+          "why": "`/` is true division, so 10/4 = 2.5." }
+    ] },
+    { "name": "Unit 2 - Conditionals", "ex": [
+        { "q": "What does this print?", "code": "let x = 7\nwhen x > 5 { print(\"big\") } dream { print(\"small\") }",
+          "opts": ["big", "small", "error"], "ans": 1, "why": "7 > 5 is true, so the `when` branch runs." },
+        { "q": "Which word is Morpheus's `else`?", "code": "when a { }  ???  { }", "opts": ["else", "dream", "other"],
+          "ans": 2, "why": "Morpheus uses `dream` for else, and `dream when` for else-if." }
+    ] },
+    { "name": "Unit 3 - Loops", "ex": [
+        { "q": "How many times does the body run?", "code": "let i = 0\nloop i < 3 { let i = i + 1 }",
+          "opts": ["2", "3", "forever"], "ans": 2, "why": "i goes 0 -> 1 -> 2 -> 3, so the body runs 3 times." },
+        { "q": "What does this print?", "code": "for n in [1, 2, 3] { print(n) }", "opts": ["1 2 3", "0 1 2", "3"],
+          "ans": 1, "why": "`for x in list` visits each element in order." }
+    ] },
+    { "name": "Unit 4 - Collections", "ex": [
+        { "q": "What does this print?", "code": "let l = [1, 2, 3]\npush(l, 4)\nprint(len(l))", "opts": ["3", "4", "5"],
+          "ans": 2, "why": "push appends one element, so the length becomes 4." },
+        { "q": "What does this print?", "code": "let m = {\"a\": 1, \"b\": 2}\nprint(m.keys())", "opts": ["[a, b]", "[1, 2]", "{a, b}"],
+          "ans": 1, "why": "keys() returns the keys, sorted, as a list." }
+    ] },
+    { "name": "Unit 5 - Functions", "ex": [
+        { "q": "What does this print?", "code": "sovereign sq(x) { signal x * x }\nprint(sq(6))", "opts": ["12", "36", "error"],
+          "ans": 2, "why": "`signal` returns a value; sq(6) = 36." },
+        { "q": "Closures keep their own state. What prints?", "code": "let c = 0\nlet inc = fn() { let c = c + 1 signal c }\nprint(inc())\nprint(inc())",
+          "opts": ["1 then 2", "1 then 1", "0 then 1"], "ans": 1, "why": "The closure remembers its own mutable `c` across calls." }
+    ] },
+    { "name": "Unit 6 - Structs", "ex": [
+        { "q": "What does this print?", "code": "struct P { x, y }\nlet p = P(2, 9)\nprint(p.y)", "opts": ["2", "9", "(2, 9)"],
+          "ans": 2, "why": "p.y reads field y, which is 9." },
+        { "q": "Structs are reference-like. What prints?", "code": "struct P { x }\nlet a = P(1)\nlet b = a\nb.x = 5\nprint(a.x)",
+          "opts": ["1", "5", "error"], "ans": 2, "why": "a and b name the SAME instance, so a.x is 5." }
+    ] },
+    { "name": "Unit 7 - Build an App", "ex": [
+        { "q": "Capstone! To store data between runs you use which builtin?", "code": "????(\"notes.txt\", text)",
+          "opts": ["print", "write_file", "push"], "ans": 2, "why": "write_file saves text to disk - real persistence." }
+    ] }
+]
+
+# ---- progress state ------------------------------------------------------
+let save_path = "learn/duo_save.txt"
+let xp = 0
+let streak = 0
+let best = 0
+let cleared = []
+let i = 0
+loop i < len(units) { let cleared = push(cleared, 0) let i = i + 1 }
+
+# load saved progress if it exists
+let save_str = ""
+heal { save_str = read_file(save_path) } dream { save_str = "" }
+when len(save_str) > 0 {
+    let parts = split(save_str, ",")
+    when len(parts) >= 2 {
+        let xp = int(parts[0])
+        let streak = int(parts[1])
+        let j = 2
+        loop (j < len(parts)) and (j - 2 < len(cleared)) {
+            let cleared = set(cleared, j - 2, int(parts[j]))
+            let j = j + 1
+        }
+    }
+}
+
+# ---- screens / interaction state ----------------------------------------
+let screen = "title"
+let mi = 0
+let u = 0
+let e = 0
+let chosen = 0
+let fbok = true
+let phase = "ex"
+let msg = ""
+let wrote = false
+
+sovereign unlocked(n) {
+    when n == 0 { signal true }
+    signal cleared[n - 1] == 1
+}
+
+sovereign save() {
+    let s = str(xp) ++ "," ++ str(streak)
+    let k = 0
+    loop k < len(cleared) { let s = s ++ "," ++ str(cleared[k]) let k = k + 1 }
+    heal { write_file(save_path, s) } dream { }
+}
+
+sovereign reset_progress() {
+    let xp = 0
+    let streak = 0
+    let k = 0
+    loop k < len(cleared) { let cleared = set(cleared, k, 0) let k = k + 1 }
+    save()
+}
+
+sovereign starter_text() {
+    let t = "whisper Your capstone app. Fill in to_celsius, save, then run the checker.\n"
+    let t = t ++ "sovereign to_celsius(f) {\n"
+    let t = t ++ "    whisper TODO: signal (f - 32) * 5 / 9\n"
+    let t = t ++ "    signal 0\n"
+    let t = t ++ "}\n"
+    let t = t ++ "\n"
+    let t = t ++ "sovereign main() {\n"
+    let t = t ++ "    print(to_celsius(32))\n"
+    let t = t ++ "    print(to_celsius(212))\n"
+    let t = t ++ "}\n"
+    signal t
+}
+
+sovereign write_starter() {
+    heal { write_file("learn/learner.morph", starter_text()) } dream { let msg = "Could not write learner.morph" }
+}
+
+# ---- drawing -------------------------------------------------------------
+sovereign draw_title() {
+    clear()
+    print("+---------------------------------------------+")
+    print("|            M O R P H E U S   D U O           |")
+    print("|        learn to code, one quest at a time     |")
+    print("+---------------------------------------------+")
+    print("")
+    print("   Learn Morpheus by playing. Earn XP, keep a streak,")
+    print("   unlock units, and finish by building a real app.")
+    print("")
+    print("              PRESS SPACE to begin")
+    print("")
+    when xp > 0 { print("   (welcome back - XP " ++ xp ++ ")") }
+    print("")
+    print("   Q quit")
+}
+
+sovereign draw_map() {
+    clear()
+    print("MORPHEUS DUO    XP " ++ xp ++ "    streak " ++ streak ++ "    best " ++ best)
+    print("------------------------------------------------------------")
+    let k = 0
+    loop k < len(units) {
+        let mark = "   "
+        when cleared[k] == 1 { let mark = " x " }
+        when (cleared[k] == 0) and (not unlocked(k)) { let mark = " L " }
+        let cursor = "   "
+        when k == mi { let cursor = " > " }
+        print(cursor ++ "[" ++ mark ++ "]  " ++ units[k]["name"])
+        let k = k + 1
+    }
+    print("------------------------------------------------------------")
+    when len(msg) > 0 { print(msg) }
+    print("W/S move    ENTER select    H help    R reset    Q quit")
+}
+
+sovereign draw_ex() {
+    clear()
+    print(units[u]["name"] ++ "    XP " ++ xp ++ "    streak " ++ streak)
+    print("------------------------------------------------------------")
+    print("Q: " ++ units[u]["ex"][e]["q"])
+    print("")
+    print(units[u]["ex"][e]["code"])
+    print("")
+    let o = units[u]["ex"][e]["opts"]
+    let n = 0
+    loop n < len(o) { print("  " ++ str(n + 1) ++ ") " ++ o[n]) let n = n + 1 }
+    print("")
+    print("Press 1, 2 or 3.     H help     Q quit")
+}
+
+sovereign draw_fb() {
+    clear()
+    print(units[u]["name"] ++ "    XP " ++ xp ++ "    streak " ++ streak)
+    print("------------------------------------------------------------")
+    when fbok {
+        print("  CORRECT!   +10 XP")
+    } dream {
+        print("  Not quite.  The answer is " ++ str(units[u]["ex"][e]["ans"]) ++ ".")
+    }
+    print("")
+    print("  " ++ units[u]["ex"][e]["why"])
+    print("")
+    print("ENTER to continue     Q quit")
+}
+
+sovereign draw_workspace() {
+    clear()
+    print("UNIT 7 - BUILD AN APP")
+    print("============================================================")
+    print("You graduated! Now build a real app, in three steps:")
+    print("")
+    print("  1. EDIT    learn/learner.morph  (already written for you)")
+    print("             make to_celsius actually convert Fahrenheit.")
+    print("")
+    print("  2. CHECK   the course grades your code with real tests:")
+    print("             node morph.js run learn/check_capstone.morph")
+    print("")
+    print("  3. COMPILE  once it passes, turn it into a native app:")
+    print("             node morph.js build learn/learner.morph")
+    print("")
+    print("Your learner.morph right now:")
+    print("------------------------------------------------------------")
+    print(starter_text())
+    print("------------------------------------------------------------")
+    when len(msg) > 0 { print(msg) }
+    print("C rewrite starter    M back to units    Q quit")
+}
+
+sovereign draw() {
+    when screen == "title" { draw_title() }
+    dream when screen == "map" { draw_map() }
+    dream when screen == "help" { draw_help() }
+    dream when screen == "ex" { draw_ex() }
+    dream when screen == "fb" { draw_fb() }
+    dream when screen == "workspace" { draw_workspace() }
+}
+
+sovereign draw_help() {
+    clear()
+    print("HOW TO PLAY")
+    print("------------------------------------------------------------")
+    print("  W / S      move the cursor between units")
+    print("  ENTER      select the unit under the cursor (or continue)")
+    print("  1 2 3      choose an answer")
+    print("  R          reset all progress")
+    print("  Q          quit")
+    print("")
+    print("   Finish a unit to unlock the next one. Finish Unit 7")
+    print("   and the build workspace opens.")
+    print("")
+    print("M / ENTER back")
+}
+
+# ---- the frame: called by the host with the latest key ------------------
+sovereign frame(k) {
+    when k == "q" { signal "over" }
+    when k == "r" { reset_progress() let mi = 0 let screen = "title" let msg = "" signal "" }
+
+    when screen == "title" {
+        when (k == " ") or (k == "\n") { let screen = "map" }
+    }
+    dream when screen == "help" {
+        when (k == "m") or (k == "\n") { let screen = "map" }
+    }
+    dream when screen == "map" {
+        when k == "w" { let mi = (mi + len(units) - 1) % len(units) let msg = "" }
+        when k == "s" { let mi = (mi + 1) % len(units) let msg = "" }
+        when k == "h" { let screen = "help" }
+        when (k == "\n") or (k == " ") {
+            when unlocked(mi) {
+                let u = mi
+                let e = 0
+                let phase = "ex"
+                let msg = ""
+                let screen = "ex"
+            } dream {
+                let msg = "Locked - clear the earlier units first."
+            }
+        }
+    }
+    dream when screen == "ex" {
+        when (k == "1") or (k == "2") or (k == "3") {
+            let chosen = int(k)
+            when chosen == units[u]["ex"][e]["ans"] {
+                let xp = xp + 10
+                let streak = streak + 1
+                when streak > best { let best = streak }
+                let fbok = true
+            } dream {
+                let streak = 0
+                let fbok = false
+            }
+            let phase = "fb"
+            let screen = "fb"
+            save()
+        }
+    }
+    dream when screen == "fb" {
+        when (k == "\n") or (k == " ") {
+            let e = e + 1
+            when e >= len(units[u]["ex"]) {
+                let cleared = set(cleared, u, 1)
+                let xp = xp + 25
+                save()
+                when u >= len(units) - 1 {
+                    let screen = "workspace"
+                    let wrote = false
+                } dream {
+                    let u = u + 1
+                    let mi = u
+                    let phase = "ex"
+                    let screen = "map"
+                    let msg = "Unit cleared! +25 XP"
+                }
+            } dream {
+                let phase = "ex"
+                let screen = "ex"
+            }
+        }
+    }
+    dream when screen == "workspace" {
+        when not wrote { write_starter() let wrote = true }
+        when k == "c" { write_starter() let msg = "Starter rewritten." }
+        when k == "m" { let screen = "map" }
+    }
+
+    draw()
+    signal ""
+}

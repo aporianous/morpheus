@@ -1,0 +1,63 @@
+whisper todo — a real CLI app with file storage. EXTEND IT: add a `remove` command.
+whisper Run (from repo root):
+whisper   node morph.js run examples/apps/todo.morph list
+whisper   node morph.js run examples/apps/todo.morph add Buy milk
+whisper   node morph.js run examples/apps/todo.morph done 1
+whisper   node morph.js run examples/apps/todo.morph clear
+
+let store = "todo.txt"
+
+sovereign load() {
+    let text = ""
+    heal { text = read_file(store) } dream { text = "" }
+    when len(text) == 0 { signal [] }
+    signal split(trim(text), "\n")
+}
+
+sovereign save(lines) {
+    write_file(store, join(lines, "\n"))
+}
+
+sovereign cmd_list() {
+    let lines = load()
+    when len(lines) == 0 { print("(empty - add something!)") signal 0 }
+    let i = 0
+    loop i < len(lines) {
+        print("  " ++ str(i + 1) ++ ". " ++ lines[i])
+        let i = i + 1
+    }
+}
+
+sovereign cmd_add(parts) {
+    let text = join(parts, " ")
+    let lines = push(load(), text)
+    save(lines)
+    print("added: " ++ text)
+}
+
+sovereign cmd_done(n) {
+    let lines = load()
+    when (n < 1) or (n > len(lines)) { print("no task " ++ str(n)) signal 0 }
+    let cur = lines[n - 1]
+    when not starts_with(cur, "[x]") { let lines = set(lines, n - 1, "[x] " ++ cur) save(lines) }
+    print("done: " ++ cur)
+}
+
+sovereign main(args) {
+    when len(args) == 0 { cmd_list() signal 0 }
+    let cmd = args[0]
+    when cmd == "list" { cmd_list() }
+    dream when cmd == "add" {
+        let words = []
+        let k = 1
+        loop k < len(args) { let words = push(words, args[k]) let k = k + 1 }
+        cmd_add(words)
+    }
+    dream when cmd == "done" {
+        when len(args) < 2 { print("usage: done <number>") }
+        dream { cmd_done(int(args[1])) }
+    }
+    dream when cmd == "clear" { save([]) print("cleared") }
+    dream { print("unknown command: " ++ cmd) print("use: list | add <text> | done <n> | clear") }
+    signal 0
+}

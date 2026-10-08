@@ -1,8 +1,13 @@
 # example app output
 summary.txt
+todo.txt
 # native build artifacts
 *.exe
 examples/*.cpp
+examples/apps/*.cpp
 examples/_div/
+learn/*.cpp
+learn/learner.morph
+learn/duo_save.txt
 # deps
 node_modules/

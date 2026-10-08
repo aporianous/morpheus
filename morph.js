@@ -91,12 +91,18 @@ if (cmd === 'run') {
 const isTTY = !!(process.stdin.isTTY && process.stdout.isTTY);
 if (isTTY) process.stdin.setRawMode(true);
 process.stdin.resume();
+const mockKeys = process.env.MORPHEUS_KEYS
+  ? process.env.MORPHEUS_KEYS.split(',').map((t) => (t === 'space' ? ' ' : t === 'enter' ? '\n' : t))
+  : null;
+let mockI = 0;
 process.stdin.on('data', (buf) => {
   for (const ch of buf.toString('utf8')) {
     if (ch === '\u0003') { cleanup(); process.exit(0); }            // Ctrl-C
     if (ch === 'A') lastKey = 'w'; else if (ch === 'B') lastKey = 's';
     else if (ch === 'C') lastKey = 'd'; else if (ch === 'D') lastKey = 'a';
-    else if (/[wasdgqWASDGQ]/.test(ch)) lastKey = ch.toLowerCase();
+    else if (ch === '\r' || ch === '\n') lastKey = '\n';            // Enter
+    else if (ch === ' ') lastKey = ' ';                             // Space
+    else if (/^[!-~]$/.test(ch)) lastKey = ch.toLowerCase();        // letters, digits, punctuation
   }
 });
 
@@ -108,6 +114,7 @@ runMorpheus(fs.readFileSync(abs, 'utf8'), Object.assign({}, common, {
   onReady: ({ call, out }) => {
     iv = setInterval(() => {
       out.length = 0;
+      if (mockKeys) lastKey = mockI < mockKeys.length ? mockKeys[mockI++] : 'q';
       let status;
       try { status = call('frame', lastKey); }
       catch (e) { cleanup(); process.stderr.write('Error: ' + (e && e.message || e) + '\n'); process.exit(1); }

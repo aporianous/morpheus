@@ -1,0 +1,86 @@
+whisper quiz — a trivia game. EXTEND IT: add more questions to `qs`.
+whisper Run:  node morph.js play examples/apps/quiz.morph
+whisper Keys: 1-3 answer   ENTER next   Q quit
+
+let qs = [
+    { "q": "Which word starts a Morpheus function?", "opts": ["def", "sovereign", "fn"], "ans": 2 },
+    { "q": "Which word returns a value?", "opts": ["signal", "return", "yield"], "ans": 1 },
+    { "q": "How do you write `else` in Morpheus?", "opts": ["else", "otherwise", "dream"], "ans": 3 }
+]
+
+let screen = "title"
+let i = 0
+let score = 0
+let picked = 0
+let ok = true
+
+sovereign draw_title() {
+    clear()
+    print("============ MORPHEUS TRIVIA ============")
+    print("")
+    print("  3 questions. Press 1-3 to answer.")
+    print("")
+    print("   PRESS SPACE to start        Q quit")
+}
+
+sovereign draw_q() {
+    clear()
+    print("Question " ++ str(i + 1) ++ " of " ++ str(len(qs)) ++ "     score " ++ str(score))
+    print("-----------------------------------------")
+    print(qs[i]["q"])
+    print("")
+    let o = qs[i]["opts"]
+    let n = 0
+    loop n < len(o) { print("  " ++ str(n + 1) ++ ") " ++ o[n]) let n = n + 1 }
+    print("")
+    print("Press 1, 2 or 3.      Q quit")
+}
+
+sovereign draw_fb() {
+    clear()
+    when ok { print("  CORRECT!") } dream { print("  Wrong - answer: " ++ str(qs[i]["ans"])) }
+    print("")
+    print("ENTER for next.      Q quit")
+}
+
+sovereign draw_end() {
+    clear()
+    print("============ DONE ============")
+    print("")
+    print("  You scored " ++ str(score) ++ " / " ++ str(len(qs)))
+    print("")
+    when score == len(qs) { print("  PERFECT!") }
+    print("")
+    print("  Edit the `qs` list to add your own questions.")
+    print("")
+    print("  R play again      Q quit")
+}
+
+sovereign frame(k) {
+    when k == "q" { signal "over" }
+    when screen == "title" {
+        when (k == " ") or (k == "\n") { let screen = "q" let i = 0 let score = 0 }
+    }
+    dream when screen == "q" {
+        when (k == "1") or (k == "2") or (k == "3") {
+            let picked = int(k)
+            when picked == qs[i]["ans"] { let ok = true let score = score + 1 } dream { let ok = false }
+            let screen = "fb"
+        }
+    }
+    dream when screen == "fb" {
+        when (k == "\n") or (k == " ") {
+            let i = i + 1
+            when i >= len(qs) { let screen = "end" } dream { let screen = "q" }
+        }
+    }
+    dream when screen == "end" {
+        when k == "r" { let screen = "title" }
+    }
+
+    when screen == "title" { draw_title() }
+    dream when screen == "q" { draw_q() }
+    dream when screen == "fb" { draw_fb() }
+    dream when screen == "end" { draw_end() }
+    signal ""
+}

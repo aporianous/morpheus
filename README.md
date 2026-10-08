@@ -7,6 +7,17 @@ themselves at runtime, values that carry a **confidence**, and a predictive
 `prophesy` primitive. It is **open-core** — the language and its tooling are
 open; a separate production runtime is private.
 
+## Learn it — interactive course (Duolingo-style)
+Play a course written in Morpheus itself — earn XP, keep a streak, unlock units,
+and finish in a **build workspace that grades your code with real tests before it
+compiles**:
+
+```
+node morph.js play learn/morpheus_duo.morph
+```
+
+See `docs/LEARN.md`, then build real apps in `examples/apps/`.
+
 ## Open (this repo)
 - The language: syntax, keywords, the spec.
 - A **reference interpreter** (`interp.js`) — runs in the browser and in Node.
