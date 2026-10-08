@@ -11,7 +11,16 @@
 #include <sstream>
 #include <random>
 #include <chrono>
+#include <thread>
+#include <cstdlib>
 #include <stdexcept>
+#ifdef _WIN32
+#include <conio.h>
+#else
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+#endif
 
 struct Value;
 using List = std::vector<Value>;
@@ -108,9 +117,9 @@ inline Value rt_random_int(const Value& a, const Value& b) { std::uniform_int_di
 
 inline Value rt_index(const Value& o, const Value& i) {
   long long idx = (long long)rt_num(i);
-  if (o.k == Value::STR) { if (idx < 0 || idx >= (long long)o.s.size()) throw RTError("IndexError"); return Value(std::string(1, o.s[idx])); }
-  if (o.k == Value::LIST) { if (idx < 0 || idx >= (long long)o.l->size()) throw RTError("IndexError"); return (*o.l)[idx]; }
-  throw RTError("Value is not indexable");
+  if (o.k == Value::STR) { if (idx < 0 || idx >= (long long)o.s.size()) throw RTError("IndexError str idx " + std::to_string(idx) + " size " + std::to_string(o.s.size())); return Value(std::string(1, o.s[idx])); }
+  if (o.k == Value::LIST) { if (idx < 0 || idx >= (long long)o.l->size()) throw RTError("IndexError list idx " + std::to_string(idx) + " size " + std::to_string(o.l->size())); return (*o.l)[idx]; }
+  throw RTError("IndexError: not indexable (kind " + std::to_string((int)o.k) + ")");
 }
 inline Value rt_push(Value l, Value v) { l.l->push_back(v); return l; }
 inline Value rt_pop(Value l) { if (l.l->empty()) return Value(0.0); Value v = l.l->back(); l.l->pop_back(); return v; }
@@ -122,3 +131,24 @@ inline Value rt_rand(Value l) { if (l.l->empty()) return Value(0.0); return (*l.
 inline Value rt_clock() { using namespace std::chrono; return Value((double)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count() / 1000.0); }
 inline Value rt_read_file(const Value& p) { std::ifstream f(rt_str(p)); if (!f) throw RTError("FileNotFoundError"); std::stringstream ss; ss << f.rdbuf(); return Value(ss.str()); }
 inline Value rt_write_file(const Value& p, const Value& t) { std::ofstream f(rt_str(p)); f << rt_str(t); return Value(0.0); }
+
+// ---- host: screen, clock, keyboard (so apps/games run natively) ----
+inline Value rt_clear() { std::cout << "\x1b[2J\x1b[H" << std::flush; return Value(0.0); }
+inline Value rt_sleep(const Value& ms) { std::this_thread::sleep_for(std::chrono::milliseconds((long long)rt_num(ms))); return Value(0.0); }
+inline Value rt_key() {
+#ifdef _WIN32
+  if (_kbhit()) {
+    int c = _getch();
+    if (c == 0 || c == 224) { int c2 = _getch(); if (c2 == 72) return Value("w"); if (c2 == 80) return Value("s"); if (c2 == 75) return Value("a"); if (c2 == 77) return Value("d"); return Value(""); }
+    if (c == 3) std::exit(0);
+    char ch = (char)c; if (ch >= 'A' && ch <= 'Z') ch = (char)(ch - 'A' + 'a');
+    if (std::string("wasdgq").find(ch) != std::string::npos) return Value(std::string(1, ch));
+  }
+  return Value("");
+#else
+  static bool init = false; static termios oldt;
+  if (!init) { tcgetattr(0, &oldt); termios t = oldt; t.c_lflag &= ~(ICANON | ECHO); t.c_cc[VMIN] = 0; t.c_cc[VTIME] = 0; tcsetattr(0, TCSANOW, &t); fcntl(0, F_SETFL, fcntl(0, F_GETFL) | O_NONBLOCK); init = true; }
+  unsigned char ch; if (read(0, &ch, 1) == 1) { if (ch == 3) std::exit(0); if (ch >= 'A' && ch <= 'Z') ch = (char)(ch - 'A' + 'a'); if (std::string("wasdgq").find((char)ch) != std::string::npos) return Value(std::string(1, (char)ch)); }
+  return Value("");
+#endif
+}

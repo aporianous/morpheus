@@ -17,10 +17,11 @@ for (const [n, c] of Object.entries({
   push: 'rt_push', pop: 'rt_pop', unshift: 'rt_unshift', set: 'rt_set',
   remove_at: 'rt_remove_at', rand: 'rt_rand',
   read_file: 'rt_read_file', write_file: 'rt_write_file', clock: 'rt_clock',
+  clear: 'rt_clear', sleep: 'rt_sleep', key: 'rt_key',
 })) BUILTINS[n] = { c, var: false };
 for (const [n, c] of Object.entries({
   print: 'rt_print', echo: 'rt_print', min: 'rt_min', max: 'rt_max', round: 'rt_round',
-  morph_rewrite: 'rt_noop', morph_constant: 'rt_noop', clear: 'rt_noop', sleep: 'rt_noop',
+  morph_rewrite: 'rt_noop', morph_constant: 'rt_noop',
 })) BUILTINS[n] = { c, var: true };
 
 const BINFN = { '+': 'rt_add', '-': 'rt_sub', '*': 'rt_mul', '/': 'rt_div', '%': 'rt_mod', '**': 'rt_pow',
@@ -64,7 +65,12 @@ function emitExpr(e) {
     case 'Bool': return 'Value(' + (e.value ? 'true' : 'false') + ')';
     case 'List': return 'Value(List{' + e.items.map(emitExpr).join(', ') + '})';
     case 'Ident': return 'v_' + e.name;
-    case 'Bin': return BINFN[e.op] + '(' + emitExpr(e.l) + ', ' + emitExpr(e.r) + ')';
+    case 'Bin': {
+      const L = emitExpr(e.l), R = emitExpr(e.r);
+      if (e.op === '&&' || e.op === 'and') return '([&](){ Value _a = (' + L + '); return rt_truthy(_a) ? (' + R + ') : _a; })()';
+      if (e.op === '||' || e.op === 'or') return '([&](){ Value _a = (' + L + '); return rt_truthy(_a) ? _a : (' + R + '); })()';
+      return BINFN[e.op] + '(' + L + ', ' + R + ')';
+    }
     case 'Un': return (e.op === '-' ? 'rt_neg' : 'rt_not') + '(' + emitExpr(e.e) + ')';
     case 'Index': return 'rt_index(' + emitExpr(e.obj) + ', ' + emitExpr(e.idx) + ')';
     case 'Call': return emitCall(e);
@@ -118,10 +124,11 @@ function emitStmt(s) {
     default: throw new Error('native backend: cannot compile statement ' + s.type);
   }
 }
-function emitFunction(f) {
+function emitFunction(f, globals) {
   const params = f.params;
   const locals = new Set(); namesIn(f.body, locals);
   for (const p of params) locals.delete(p);
+  for (const g of (globals || new Set())) locals.delete(g);
   let code = 'Value ' + fnName(f.name) + '(' + params.map((p) => 'Value v_' + p).join(', ') + ') {\n';
   for (const nm of locals) code += '  Value v_' + nm + ';\n';
   code += emitBlock(f.body) + '\n  return Value(0.0);\n}\n';
@@ -153,15 +160,26 @@ function compileToCpp(absPath) {
   for (const g of globals) code += 'Value v_' + g + ';\n';
   for (const f of funcs) code += signature(f);
   code += '\n';
-  for (const f of funcs) code += emitFunction(f) + '\n';
+  for (const f of funcs) code += emitFunction(f, globals) + '\n';
 
+  const mainFn = out.funcs.find((f) => f.name === 'main');
+  const frameFn = out.funcs.find((f) => f.name === 'frame');
   code += 'int main(int argc, char** argv) { (void)argc; (void)argv;\n';
   for (const s of out.tops) code += emitStmt(s) + '\n';
-  const mainFn = out.funcs.find((f) => f.name === 'main');
   if (mainFn) {
     const locals = new Set(); namesIn(mainFn.body, locals);
+    for (const g of globals) locals.delete(g);
     for (const nm of locals) code += '  Value v_' + nm + ';\n';
     code += emitBlock(mainFn.body) + '\n';
+  } else if (frameFn) {
+    // host-driven app: the runtime owns the clock + keyboard, Morpheus owns the logic
+    code += '  double _tick = 140;\n';
+    code += '  for (;;) {\n';
+    code += '    Value _st = ' + fnName('frame') + '(rt_key());\n';
+    code += '    std::string _s = rt_str(_st);\n';
+    code += '    if (_s == "over" || _s == "win") { std::cout << (_s == "win" ? "\\n*** YOU WIN ***\\n" : "\\n*** GAME OVER ***\\n"); break; }\n';
+    code += '    rt_sleep(Value(_tick));\n';
+    code += '  }\n';
   }
   code += '  return 0;\n}\n';
   return code;

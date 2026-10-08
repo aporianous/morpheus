@@ -41,6 +41,13 @@ with `g++ -O2 -static`, so the binary runs anywhere. Recursion, `prophesy`,
 lists and `import` all compile. That's a real systems-language path for the
 supported subset.
 
+Games compile too — the native runtime provides the screen, clock and keyboard
+(`clear` / `sleep` / `key`):
+
+```
+node morph.js build examples/snake.morph     # → snake.exe, plays natively (WASD, G, Q)
+```
+
 ## Build apps
 Morpheus is enough to write real programs: `import` modules, file I/O
 (`read_file` / `write_file`), `argv`, and — for games — a host-driven frame
