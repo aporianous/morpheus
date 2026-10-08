@@ -187,6 +187,12 @@ when len(save_str) > 0 {
     } dream {
         let legacy = split(trim(save_str), ",")
         when len(legacy) >= 1 { let xp = int(legacy[0]) }
+        when len(legacy) >= 2 { let best = int(legacy[1]) }
+        let j = 2
+        loop (j < len(legacy)) and (j - 2 < len(cleared)) {
+            let cleared = set(cleared, j - 2, int(legacy[j]))
+            let j = j + 1
+        }
     }
 }
 
