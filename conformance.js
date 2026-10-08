@@ -7,7 +7,7 @@ const root = __dirname, dir = path.join(root, 'examples');
 
 const cases = {
   hello: [], fib: [], forecast: [], words: [], text: [],
-  typed: [], arena: [], conformance: [], notes: ['examples/sample-notes.txt'],
+  typed: [], arena: [], conformance: [], structs: [], notes: ['examples/sample-notes.txt'],
 };
 
 const nondet = new Set(['forecast', 'arena']);

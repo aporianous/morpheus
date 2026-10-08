@@ -6,7 +6,7 @@
 
   // ---------- tokenizer ----------
   const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++', '->', '..'];
-  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena','break','continue','for','in']);
+  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena','break','continue','for','in','struct']);
 
   function tokenize(src) {
     const t = [];
@@ -65,6 +65,7 @@
 
     function statement() {
       if (isKw('sovereign')) return funcDecl();
+      if (isKw('struct')) return structDecl();
       if (isKw('extern')) return externDecl();
       if (isKw('let')) { next(); const name = next().value; let typeName = null; if (isOp(':')) { next(); typeName = next().value; } eatOp('='); return { type: 'Let', name, expr: expression(), typeName }; }
       if (isKw('when')) return ifStmt();
@@ -79,12 +80,19 @@
       if (isKw('break')) { next(); return { type: 'Break' }; }
       if (isKw('continue')) { next(); return { type: 'Continue' }; }
       if (isKw('for')) { next(); const name = next().value; if (!isKw('in')) throw new Error('expected "in" after for variable'); next(); const iter = expression(); return { type: 'ForIn', name, iter, body: block() }; }
-      // assignment vs bare expression
-      if (peek().type === 'ident' && t[p+1] && t[p+1].type === 'op' && t[p+1].value === '=') {
-        const name = next().value; eatOp('='); return { type: 'Assign', name, expr: expression() };
+      // assignment (target may be a name, a field `x.y`, or an index `x[i]`)
+      { const lhs = expression();
+        if (isOp('=')) {
+          next(); const rhs = expression();
+          if (lhs.type !== 'Ident' && lhs.type !== 'Member' && lhs.type !== 'Index') throw new Error('invalid assignment target');
+          return { type: 'Assign', target: lhs, expr: rhs };
+        }
+        return { type: 'ExprStmt', expr: lhs };
       }
-      return { type: 'ExprStmt', expr: expression() };
     }
+    function structDecl() { next(); const name = next().value; eat('{'); const fields = [];
+      while (!isP('}')) { if (isOp(',')) { next(); continue; } fields.push(next().value); }
+      eat('}'); return { type: 'TypeDecl', name, fields }; }
     function paramList() { const params = [], paramTypes = []; eat('(');
       while (!isP(')')) { const pn = next().value; let pt = null; if (isOp(':')) { next(); pt = next().value; } params.push(pn); paramTypes.push(pt); if (isOp(',')) next(); }
       eat(')'); return { params, paramTypes };
@@ -175,7 +183,7 @@
   function runMorpheus(src, options) {
     options = options || {};
     const out = [];
-    const env = { vars: Object.create(null), funcs: Object.create(null), out, file: options.basePath || '<main>' };
+    const env = { vars: Object.create(null), funcs: Object.create(null), types: Object.create(null), out, file: options.basePath || '<main>' };
     const loaded = new Set();
     const g = Object.assign(builtins(env), options.builtins || {});
 
@@ -187,7 +195,7 @@
         case 'Bin': return applyBin(node.op, evalExpr(node.l), evalExpr(node.r));
         case 'Un': { const v = evalExpr(node.e); return node.op === '-' ? -v : !truthy(v); }
         case 'Call': return callF(node.callee, node.args.map(evalExpr));
-        case 'Member': { const o = evalExpr(node.obj); return o[node.name]; }
+        case 'Member': { const o = evalExpr(node.obj); if (o instanceof Map) { if (!o.has(node.name)) throw new Error('KeyError: ' + node.name); return o.get(node.name); } return o[node.name]; }
         case 'Index': { const o = evalExpr(node.obj), i = evalExpr(node.idx); if (o instanceof Map) { if (!o.has(i)) throw new Error('KeyError: ' + fmt(i)); return o.get(i); } if (Array.isArray(o)) { if (i < 0 || i >= o.length) throw new Error('IndexError: list idx ' + i + ' size ' + o.length); return o[i]; } if (typeof o === 'string') { if (i < 0 || i >= o.length) throw new Error('IndexError: str idx ' + i + ' size ' + o.length); return o[i]; } throw new Error('IndexError: not indexable'); }
         case 'Range': { const a = evalExpr(node.a), b = evalExpr(node.b); const out = []; for (let i = a; i < b; i++) out.push(i); return out; }
         case 'Map': { const m = new Map(); for (const p of node.pairs) { const kk = evalExpr(p.key); m.set(typeof kk === 'string' ? kk : fmt(kk), evalExpr(p.value)); } return m; }
@@ -219,6 +227,7 @@
     function lookup(name) { if (name in env.vars) return env.vars[name]; throw new Error("undefined variable '" + name + "'"); }
     function callF(callee, args) {
       if (callee.type === 'Member' && g[callee.name]) return g[callee.name](evalExpr(callee.obj), ...args);
+      if (callee.type === 'Ident' && env.types[callee.name]) { const m = new Map(); env.types[callee.name].forEach((f, i) => m.set(f, args[i])); return m; }
       let name;
       if (callee.type === 'Ident') name = callee.name;
       if (name && g[name]) return g[name](...args);
@@ -237,7 +246,13 @@
       switch (s.type) {
         case 'FuncDecl': env.funcs[s.name] = { params: s.params, body: s.body }; return undefined;
         case 'Extern': return undefined;
-        case 'Let': case 'Assign': env.vars[s.name] = evalExpr(s.expr); return undefined;
+        case 'TypeDecl': env.types[s.name] = s.fields; return undefined;
+        case 'Let': env.vars[s.name] = evalExpr(s.expr); return undefined;
+        case 'Assign': { const tg = s.target, v = evalExpr(s.expr);
+          if (tg.type === 'Ident') env.vars[tg.name] = v;
+          else if (tg.type === 'Member') { const o = evalExpr(tg.obj); if (o instanceof Map) o.set(tg.name, v); else o[tg.name] = v; }
+          else { const o = evalExpr(tg.obj), i = evalExpr(tg.idx); if (o instanceof Map) o.set(i, v); else o[i] = v; }
+          return v; }
         case 'ExprStmt': return evalExpr(s.expr);
         case 'If': if (truthy(evalExpr(s.cond))) return execBlockValue(s.body); else if (s.alt) return execBlockValue(s.alt); return undefined;
         case 'While': { let r; let guard = 0; while (truthy(evalExpr(s.cond))) { try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) break; if (e[CONT]) { if (++guard > 1e7) throw new Error('loop limit exceeded'); continue; } throw e; } if (++guard > 1e7) throw new Error('loop limit exceeded'); } return r; }

@@ -73,6 +73,23 @@ print(m.has("b"))       # true
 for k in m.keys() { print(k) }
 ```
 
+## Structs (user-defined types)
+```
+struct Point { x, y }
+
+let p = Point(3, 4)     # construct: fields in declaration order
+print(p.x)              # field access
+p.x = 10                # field assignment
+
+struct Line { a, b }
+let l = Line(Point(1, 2), Point(3, 4))
+print(l.b.y)            # 4 — structs nest
+```
+A struct value is a map with those keys, so `keys(p)`, `p.has("x")`,
+`for k in p.keys()` work exactly as for a map. Structs are **reference-like**:
+`let q = p` shares the same instance, so mutating `q.x` changes `p.x`.
+Reading a field that does not exist is a `KeyError`.
+
 ## Member sugar
 A method call on a value is sugar for a call with that value first:
 ```

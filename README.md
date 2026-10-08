@@ -98,8 +98,9 @@ The full language is documented in [`docs/LANGUAGE.md`](docs/LANGUAGE.md):
 `when` / `dream when` / `dream` (if/elif/else), `loop`, `for … in` with
 `break` / `continue`, ternary `c ? a : b`, lists `[..]` with indexing and
 slicing `a[i:j]`, maps `{ "k": v }` with `keys` / `has` / `put` / `get`, ranges
-`a..b`, member sugar (`s.upper()` ≡ `upper(s)`), `prophesy`, `arena`, modules
-(`import`) and C FFI (`extern`), backed by a full standard library.
+`a..b`, member sugar (`s.upper()` ≡ `upper(s)`), user-defined `struct` types,
+`prophesy`, `arena`, modules (`import`) and C FFI (`extern`), backed by a full
+standard library.
 
 ## Conformance
 The interpreter and the native backend are held to the same behavior:

@@ -135,6 +135,7 @@ inline Value rt_index(const Value& o, const Value& i) {
   if (o.k == Value::MAP) { auto it = o.m->find(rt_str(i)); if (it == o.m->end()) throw RTError("KeyError: " + rt_str(i)); return it->second; }
   throw RTError("IndexError: not indexable (kind " + std::to_string((int)o.k) + ")");
 }
+inline Value rt_set_index(Value o, Value i, Value v) { if (o.k == Value::MAP) { (*o.m)[rt_str(i)] = v; return v; } if (o.k == Value::LIST) { long long idx = (long long)rt_num(i); if (idx < 0 || idx >= (long long)o.l->size()) throw RTError("IndexError list set idx " + std::to_string(idx) + " size " + std::to_string(o.l->size())); (*o.l)[idx] = v; return v; } throw RTError("IndexError: not assignable"); }
 inline Value rt_push(Value l, Value v) { l.l->push_back(v); return l; }
 inline Value rt_pop(Value l) { if (l.l->empty()) return Value(0.0); Value v = l.l->back(); l.l->pop_back(); return v; }
 inline Value rt_unshift(Value l, Value v) { l.l->insert(l.l->begin(), v); return l; }
