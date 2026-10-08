@@ -26,9 +26,20 @@ for (const [n, c] of Object.entries({
 })) BUILTINS[n] = { c, var: false };
 for (const [n, c] of Object.entries({
   print: 'rt_print', echo: 'rt_print', min: 'rt_min', max: 'rt_max', round: 'rt_round',
-  morph_rewrite: 'rt_noop', morph_constant: 'rt_noop',
+  morph_rewrite: 'rt_noop', morph_constant: 'rt_noop', input: 'rt_noop',
+  type: 'rt_type', int: 'rt_toint', float: 'rt_tofloat', str: 'rt_tostr',
+  floor: 'rt_floor', ceil: 'rt_ceil', tan: 'rt_tan', log: 'rt_log',
+  upper: 'rt_upper', lower: 'rt_lower', trim: 'rt_trim', split: 'rt_split', join: 'rt_join',
+  contains: 'rt_contains', index_of: 'rt_index_of', substr: 'rt_substr', replace: 'rt_replace',
+  starts_with: 'rt_starts_with', ends_with: 'rt_ends_with', repeat: 'rt_repeat',
+  shift: 'rt_shift', insert: 'rt_insert', remove: 'rt_remove', reverse: 'rt_reverse', sort: 'rt_sort',
+  range: 'rt_range', sum: 'rt_sum', min_of: 'rt_min_of', max_of: 'rt_max_of',
+  keys: 'rt_keys', values: 'rt_values', has: 'rt_has', get: 'rt_get', put: 'rt_put', del: 'rt_del',
 })) BUILTINS[n] = { c, var: true };
-const BUILTIN_RET = { arena_bytes: 'float', len: 'int', random_int: 'int', abs: 'float', sqrt: 'float', sin: 'float', cos: 'float', exp: 'float', pow: 'float', round: 'float', min: 'float', max: 'float', random_uniform: 'float', random_norm: 'float' };
+const BUILTIN_RET = { arena_bytes: 'float', len: 'int', random_int: 'int', abs: 'float', sqrt: 'float', sin: 'float', cos: 'float', exp: 'float', pow: 'float', round: 'float', min: 'float', max: 'float', random_uniform: 'float', random_norm: 'float',
+  type: 'str', int: 'int', str: 'str', floor: 'float', ceil: 'float', tan: 'float', log: 'float',
+  upper: 'str', lower: 'str', trim: 'str', substr: 'str', replace: 'str', join: 'str',
+  contains: 'bool', has: 'bool', starts_with: 'bool', ends_with: 'bool', index_of: 'int', sum: 'float' };
 
 const BINFN = { '+': 'rt_add', '-': 'rt_sub', '*': 'rt_mul', '/': 'rt_div', '%': 'rt_mod', '**': 'rt_pow',
   '++': 'rt_cat', '>': 'rt_gt', '<': 'rt_lt', '>=': 'rt_ge', '<=': 'rt_le', '==': 'rt_eq', '!=': 'rt_ne' };
@@ -45,6 +56,10 @@ function namesExpr(e, acc) {
     case 'Call': e.args.forEach((a) => namesExpr(a, acc)); break;
     case 'Index': namesExpr(e.obj, acc); namesExpr(e.idx, acc); break;
     case 'List': e.items.forEach((a) => namesExpr(a, acc)); break;
+    case 'Cond': namesExpr(e.cond, acc); namesExpr(e.then, acc); namesExpr(e.els, acc); break;
+    case 'Range': namesExpr(e.a, acc); namesExpr(e.b, acc); break;
+    case 'Map': e.pairs.forEach((p) => { namesExpr(p.key, acc); namesExpr(p.value, acc); }); break;
+    case 'Slice': namesExpr(e.obj, acc); if (e.start) namesExpr(e.start, acc); if (e.end) namesExpr(e.end, acc); break;
     case 'Prophesy': namesIn(e.body, acc); break;
     case 'Weave': namesIn(e.body, acc); break;
   }
@@ -55,6 +70,8 @@ function namesStmt(s, acc) {
     case 'ExprStmt': namesExpr(s.expr, acc); break;
     case 'If': namesExpr(s.cond, acc); namesIn(s.body, acc); if (s.alt) namesIn(s.alt, acc); break;
     case 'While': namesExpr(s.cond, acc); namesIn(s.body, acc); break;
+    case 'ForIn': acc.add(s.name); namesExpr(s.iter, acc); namesIn(s.body, acc); break;
+    case 'Break': case 'Continue': break;
     case 'Return': namesExpr(s.expr, acc); break;
     case 'Heal': namesIn(s.body, acc); if (s.alt) namesIn(s.alt, acc); break;
     case 'Block': namesIn(s.body, acc); break;
@@ -66,7 +83,7 @@ function namesIn(stmts, acc) { for (const s of stmts) namesStmt(s, acc); }
 // ---------- dynamic (Value) code generation ----------
 function emitExpr(e) {
   switch (e.type) {
-    case 'Num': return 'Value(' + e.value + ')';
+    case 'Num': return 'Value((double)' + e.value + ')';
     case 'Str': return 'Value(' + esc(e.value) + ')';
     case 'Bool': return 'Value(' + (e.value ? 'true' : 'false') + ')';
     case 'List': { const inner = 'List{' + e.items.map(emitExpr).join(', ') + '}'; return (CTX.arena > 0 ? 'rt_arena_list(' + inner + ')' : 'Value(' + inner + ')'); }
@@ -79,6 +96,11 @@ function emitExpr(e) {
     }
     case 'Un': return (e.op === '-' ? 'rt_neg' : 'rt_not') + '(' + emitExpr(e.e) + ')';
     case 'Index': return 'rt_index(' + emitExpr(e.obj) + ', ' + emitExpr(e.idx) + ')';
+    case 'Member': return 'rt_index(' + emitExpr(e.obj) + ', Value(' + esc(e.name) + '))';
+    case 'Range': return 'rt_range(std::vector<Value>{' + emitExpr(e.a) + ', ' + emitExpr(e.b) + '})';
+    case 'Map': { const parts = []; for (const p of e.pairs) { parts.push(emitExpr(p.key)); parts.push(emitExpr(p.value)); } return 'rt_map(std::vector<Value>{' + parts.join(', ') + '})'; }
+    case 'Slice': { const o = emitExpr(e.obj); const a = e.start ? '(long long)rt_num(' + emitExpr(e.start) + ')' : '0'; return '([&](){ Value _o = ' + o + '; long long _a = ' + a + '; long long _n = (_o.k == Value::STR ? (long long)_o.s.size() : (long long)_o.l->size()); long long _b = ' + (e.end ? '(long long)rt_num(' + emitExpr(e.end) + ')' : '_n') + '; if (_b < _a) _b = _a; if (_b > _n) _b = _n; if (_o.k == Value::STR) return Value(_o.s.substr(_a, _b - _a)); List _l(_o.l->begin() + _a, _o.l->begin() + _b); return Value(_l); })()'; }
+    case 'Cond': return '([&](){ return rt_truthy(' + emitExpr(e.cond) + ') ? (' + emitExpr(e.then) + ') : (' + emitExpr(e.els) + '); })()';
     case 'Call': return emitCall(e);
     case 'Prophesy': return emitProphesy(e);
     case 'Weave': return emitWeave(e);
@@ -87,6 +109,12 @@ function emitExpr(e) {
   }
 }
 function emitCall(e) {
+  if (e.callee.type === 'Member') {
+    const b = BUILTINS[e.callee.name];
+    if (!b) throw new Error('native backend: unknown method .' + e.callee.name);
+    const all = [emitExpr(e.callee.obj)].concat(e.args.map(emitExpr));
+    return b.var ? b.c + '(std::vector<Value>{' + all.join(', ') + '})' : b.c + '(' + all.join(', ') + ')';
+  }
   if (e.callee.type !== 'Ident') throw new Error('native backend: only named functions can be called');
   const name = e.callee.name;
   const ex = CTX.externs.get(name);
@@ -121,10 +149,13 @@ function emitStmt(s) {
     case 'ExprStmt': return emitExpr(s.expr) + ';';
     case 'If': return 'if (rt_truthy(' + emitExpr(s.cond) + ')) {\n' + emitBlock(s.body) + '\n}' + (s.alt ? ' else {\n' + emitBlock(s.alt) + '\n}' : '');
     case 'While': return '{ long long _g = 0; while (rt_truthy(' + emitExpr(s.cond) + ')) { if (++_g > 100000000LL) throw RTError("loop limit exceeded");\n' + emitBlock(s.body) + '\n} }';
-    case 'Return': return 'return ' + emitExpr(s.expr) + ';';
+    case 'Return': return CTX.mainEntry ? 'return (int)rt_num(' + emitExpr(s.expr) + ');' : 'return ' + emitExpr(s.expr) + ';';
     case 'Heal': return emitHeal(s);
     case 'Block': return '{\n' + emitBlock(s.body) + '\n}';
     case 'Arena': { CTX.arena = (CTX.arena || 0) + 1; const ab = emitBlock(s.body); CTX.arena--; return '{ RtArena _ar;\n' + ab + '\n}'; }
+    case 'ForIn': { CTX.forN = (CTX.forN || 0) + 1; const it = '_it' + CTX.forN; const body = emitBlock(s.body); return '{ Value ' + it + ' = ' + emitExpr(s.iter) + '; if (' + it + '.k == Value::STR) { for (char _c : ' + it + '.s) { v_' + s.name + ' = Value(std::string(1, _c));\n' + body + '\n} } else { for (size_t _i = 0; _i < ' + it + '.l->size(); ++_i) { v_' + s.name + ' = (*' + it + '.l)[_i];\n' + body + '\n} } }'; }
+    case 'Break': return 'break;';
+    case 'Continue': return 'continue;';
     case 'Noop': return ';';
     case 'FuncDecl': case 'Extern': return '';
     default: throw new Error('native backend: cannot compile statement ' + s.type);
@@ -210,6 +241,7 @@ function emitTExpr(e, env) {
     case 'Ident': return 'v_' + e.name;
     case 'Un': return e.op === '-' ? '(-(' + emitTExpr(e.e, env) + '))' : '(!(' + emitTExpr(e.e, env) + '))';
     case 'Bin': return emitTBin(e, env);
+    case 'Cond': return '([&](){ return (' + emitTExpr(e.cond, env) + ') ? (' + emitTExpr(e.then, env) + ') : (' + emitTExpr(e.els, env) + '); })()';
     case 'Call': return emitTCall(e, env);
     default: throw new Error('typed backend: unsupported expression ' + e.type);
   }
@@ -222,6 +254,8 @@ function emitTStmt(s, env, retT) {
     case 'While': return '{ long long _g = 0; while (' + emitTExpr(s.cond, env) + ') { if (++_g > 100000000LL) throw RTError("loop limit exceeded");\n' + emitTBlock(s.body, env, retT) + '\n} }';
     case 'Return': return retT === 'void' ? 'return;' : 'return ' + emitTExpr(s.expr, env) + ';';
     case 'Block': case 'Arena': return '{\n' + emitTBlock(s.body, env, retT) + '\n}';
+    case 'Break': return 'break;';
+    case 'Continue': return 'continue;';
     case 'Noop': return ';';
     default: throw new Error('typed backend: unsupported statement ' + s.type);
   }
@@ -304,8 +338,11 @@ function compileToCpp(absPath) {
   if (mainFn) {
     const locals = new Set(); namesIn(mainFn.body, locals);
     for (const g of globals) locals.delete(g);
+    if (mainFn.params.length) { locals.delete(mainFn.params[0]); code += '  Value v_' + mainFn.params[0] + ' = rt_args(argc, argv);\n'; }
     for (const nm of locals) code += '  Value v_' + nm + ';\n';
+    CTX.mainEntry = true;
     code += emitBlock(mainFn.body) + '\n';
+    CTX.mainEntry = false;
   } else if (frameFn) {
     code += '  double _tick = 140;\n  for (;;) {\n';
     code += '    Value _st = ' + fnName('frame') + '(rt_key());\n';

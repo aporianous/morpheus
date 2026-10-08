@@ -1,0 +1,56 @@
+whisper conformance — exercises the full language.
+
+sovereign classify(n) {
+    when n < 0 {
+        signal "neg"
+    }
+    dream when n == 0 {
+        signal "zero"
+    }
+    dream {
+        signal "pos"
+    }
+}
+
+sovereign main() {
+    print(classify(-5))
+    print(classify(0))
+    print(classify(9))
+
+    let total = 0
+    for x in [1, 2, 3, 4, 5] {
+        when x == 3 { continue }
+        when x == 5 { break }
+        let total = total + x
+    }
+    print(total)
+
+    print(3 > 2 ? "yes" : "no")
+    print(len(0..5))
+
+    let s = "Morpheus"
+    print(s.upper())
+    print(s.lower())
+    print(s.substr(0, 4))
+    print(s.contains("orp"))
+    print(len(s.split("r")))
+
+    let nums = [5, 3, 9, 1]
+    print(sum(nums))
+    print(min_of(nums))
+    print(max_of(nums))
+    print(sort(nums))
+    print(reverse(nums))
+    print(nums[1:3])
+
+    let m = { "a": 1, "b": 2 }
+    print(m["a"])
+    print(m.has("b"))
+    print(m.keys())
+    print(len(m))
+    put(m, "c", 3)
+    print(m["c"])
+    print(type(m))
+    print(type(nums))
+    print(type(s))
+}

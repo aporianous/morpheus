@@ -5,8 +5,8 @@
   'use strict';
 
   // ---------- tokenizer ----------
-  const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++', '->'];
-  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena']);
+  const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++', '->', '..'];
+  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena','break','continue','for','in']);
 
   function tokenize(src) {
     const t = [];
@@ -29,7 +29,7 @@
         i++; push('str', s); continue;
       }
       // numbers
-      if (/[0-9]/.test(c)) { let j = i; while (j < src.length && /[0-9.]/.test(src[j])) j++; push('num', parseFloat(src.slice(i, j))); i = j; continue; }
+      if (/[0-9]/.test(c)) { let j = i, dot = false; while (j < src.length && /[0-9.]/.test(src[j])) { if (src[j] === '.') { if (dot || src[j + 1] === '.') break; dot = true; } j++; } push('num', parseFloat(src.slice(i, j))); i = j; continue; }
       // identifiers / keywords
       if (/[A-Za-z_$]/.test(c)) {
         let j = i; while (j < src.length && /[A-Za-z0-9_$]/.test(src[j])) j++;
@@ -40,7 +40,7 @@
       if (OPS.includes(two)) { push('op', two); i += 2; continue; }
       const map = { '\u2190': '=', '\u226B': '>', '\u226A': '<' };
       if (map[c]) { push('op', map[c]); i++; continue; }
-      if ('+-*/%<>=!.,;:'.includes(c)) { push('op', c); i++; continue; }
+      if ('+-*/%<>=!.,;?:'.includes(c)) { push('op', c); i++; continue; }
       if ('(){}[]'.includes(c)) { push('punct', c); i++; continue; }
       throw new Error('line ' + line + ': unexpected character ' + JSON.stringify(c));
     }
@@ -76,6 +76,9 @@
       if (isKw('vision')) { next(); next(); return { type: 'Noop' }; }
       if (isKw('morph')) return { type: 'Block', body: block() };
       if (isKw('arena')) { next(); return { type: 'Arena', body: block() }; }
+      if (isKw('break')) { next(); return { type: 'Break' }; }
+      if (isKw('continue')) { next(); return { type: 'Continue' }; }
+      if (isKw('for')) { next(); const name = next().value; if (!isKw('in')) throw new Error('expected "in" after for variable'); next(); const iter = expression(); return { type: 'ForIn', name, iter, body: block() }; }
       // assignment vs bare expression
       if (peek().type === 'ident' && t[p+1] && t[p+1].type === 'op' && t[p+1].value === '=') {
         const name = next().value; eatOp('='); return { type: 'Assign', name, expr: expression() };
@@ -95,7 +98,8 @@
       return { type: 'Extern', name, params, paramTypes, returnType };
     }
     function ifStmt() { next(); const cond = expression(); const body = block();
-      let alt = null; if (isKw('dream')) { next(); alt = block(); } return { type: 'If', cond, body, alt };
+      let alt = null; if (isKw('dream')) { next(); alt = isKw('when') ? [ifStmt()] : block(); }
+      return { type: 'If', cond, body, alt };
     }
     function healStmt() { next();
       let errName = null;
@@ -106,7 +110,7 @@
     function fromStmt() { next(); next(); next(); next(); return { type: 'Noop' }; } // `from python import x` -> noop in the browser demo
     function importStmt() { next(); const tok = peek(); if (tok.type !== 'str') throw new Error('import expects a file path string'); next(); return { type: 'Import', path: tok.value }; }
 
-    function expression() { return orE(); }
+    function expression() { let c = orE(); if (isOp('..')) { next(); c = { type: 'Range', a: c, b: orE() }; } if (isOp('?')) { next(); const t = expression(); eatOp(':'); const f = expression(); return { type: 'Cond', cond: c, then: t, els: f }; } return c; }
     function bin(left, ops, rhs) { let node = left(); while ((peek().type === 'op' || peek().type === 'kw') && ops.includes(peek().value)) { const op = next().value; node = { type: 'Bin', op, l: node, r: rhs() }; } return node; }
     function orE() { return bin(andE, ['||', 'or'], orRHS); }
     function andE() { return bin(eqE, ['&&', 'and'], andRHS); }
@@ -123,7 +127,13 @@
       for (;;) {
         if (isP('(')) { next(); const args = []; while (!isP(')')) { args.push(expression()); if (isOp(',')) next(); } eat(')'); node = { type: 'Call', callee: node, args }; }
         else if (isOp('.')) { next(); const name = next().value; node = { type: 'Member', obj: node, name }; }
-        else if (isP('[')) { next(); const idx = expression(); eat(']'); node = { type: 'Index', obj: node, idx }; }
+        else if (isP('[')) { next();
+          let start = null, end = null, slice = false;
+          if (!isOp(':')) start = expression();
+          if (isOp(':')) { slice = true; next(); if (!isP(']')) end = expression(); }
+          eat(']');
+          node = slice ? { type: 'Slice', obj: node, start, end } : { type: 'Index', obj: node, idx: start };
+        }
         else break;
       }
       return node;
@@ -139,6 +149,7 @@
       if (tok.type === 'ident') { next(); return { type: 'Ident', name: tok.value }; }
       if (isP('(')) { next(); const e = expression(); eat(')'); return e; }
       if (isP('[')) { next(); const items = []; while (!isP(']')) { items.push(expression()); if (isOp(',')) next(); } eat(']'); return { type: 'List', items }; }
+      if (isP('{')) { next(); const pairs = []; while (!isP('}')) { const key = expression(); eatOp(':'); const value = expression(); pairs.push({ key, value }); if (isOp(',')) next(); } eat('}'); return { type: 'Map', pairs }; }
       throw new Error('line ' + tok.line + ': unexpected token ' + JSON.stringify(tok.value));
     }
     function prophesy() { next();
@@ -160,7 +171,7 @@
   }
 
   // ---------- interpreter ----------
-  const RET = Symbol('return');
+  const RET = Symbol('return'); const BRK = Symbol('break'); const CONT = Symbol('continue');
   function runMorpheus(src, options) {
     options = options || {};
     const out = [];
@@ -177,7 +188,11 @@
         case 'Un': { const v = evalExpr(node.e); return node.op === '-' ? -v : !truthy(v); }
         case 'Call': return callF(node.callee, node.args.map(evalExpr));
         case 'Member': { const o = evalExpr(node.obj); return o[node.name]; }
-        case 'Index': { const o = evalExpr(node.obj), i = evalExpr(node.idx); return o[i]; }
+        case 'Index': { const o = evalExpr(node.obj), i = evalExpr(node.idx); if (o instanceof Map) return o.get(i); return o[i]; }
+        case 'Range': { const a = evalExpr(node.a), b = evalExpr(node.b); const out = []; for (let i = a; i < b; i++) out.push(i); return out; }
+        case 'Map': { const m = new Map(); for (const p of node.pairs) { const kk = evalExpr(p.key); m.set(typeof kk === 'string' ? kk : fmt(kk), evalExpr(p.value)); } return m; }
+        case 'Slice': { const o = evalExpr(node.obj); const s = node.start ? evalExpr(node.start) : 0; const e = node.end ? evalExpr(node.end) : o.length; return o.slice(s, e); }
+        case 'Cond': return truthy(evalExpr(node.cond)) ? evalExpr(node.then) : evalExpr(node.els);
         case 'Weave': { const res = []; for (const s of node.body) { const r = execStmt(s); if (r !== undefined) res.push(r); } return res; }
         case 'Prophesy': {
           const vals = [];
@@ -203,6 +218,7 @@
     function truthy(v) { return !!(v && v !== 0); }
     function lookup(name) { if (name in env.vars) return env.vars[name]; throw new Error("undefined variable '" + name + "'"); }
     function callF(callee, args) {
+      if (callee.type === 'Member' && g[callee.name]) return g[callee.name](evalExpr(callee.obj), ...args);
       let name;
       if (callee.type === 'Ident') name = callee.name;
       if (name && g[name]) return g[name](...args);
@@ -224,7 +240,10 @@
         case 'Let': case 'Assign': env.vars[s.name] = evalExpr(s.expr); return undefined;
         case 'ExprStmt': return evalExpr(s.expr);
         case 'If': if (truthy(evalExpr(s.cond))) return execBlockValue(s.body); else if (s.alt) return execBlockValue(s.alt); return undefined;
-        case 'While': { let r; let guard = 0; while (truthy(evalExpr(s.cond))) { r = execBlockValue(s.body); if (++guard > 1e7) throw new Error('loop limit exceeded'); } return r; }
+        case 'While': { let r; let guard = 0; while (truthy(evalExpr(s.cond))) { try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) break; if (e[CONT]) { if (++guard > 1e7) throw new Error('loop limit exceeded'); continue; } throw e; } if (++guard > 1e7) throw new Error('loop limit exceeded'); } return r; }
+        case 'ForIn': { const it = evalExpr(s.iter); let r; const seq = typeof it === 'string' ? it.split('') : it; for (const v of seq) { env.vars[s.name] = v; try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) break; if (e[CONT]) continue; throw e; } } return r; }
+        case 'Break': { const e = {}; e[BRK] = true; throw e; }
+        case 'Continue': { const e = {}; e[CONT] = true; throw e; }
         case 'Return': { const e = {}; e[RET] = true; e.value = evalExpr(s.expr); throw e; }
         case 'Heal': { try { return execBlockValue(s.body); } catch (e) { if (e[RET]) throw e; if (s.alt) return execBlockValue(s.alt); throw e; } }
         case 'Block': return execBlockValue(s.body);
@@ -252,7 +271,7 @@
       const b = {
         print: (...a) => { out.push(a.map(fmt).join(' ')); return undefined; },
         echo: (...a) => { out.push(a.map(fmt).join(' ')); return undefined; },
-        len: (x) => (x && x.length !== undefined) ? x.length : 0,
+        len: (x) => (x && x.size !== undefined) ? x.size : (x && x.length !== undefined) ? x.length : 0,
         abs: Math.abs, pow: Math.pow, sqrt: Math.sqrt, round: (...a) => (a.length > 1 ? Number(a[0].toFixed(a[1])) : Math.round(a[0])),
         sin: Math.sin, cos: Math.cos, exp: Math.exp,
         min: (...a) => Math.min(...a), max: (...a) => Math.max(...a),
@@ -267,19 +286,43 @@
         env: (k) => (options.env ? options.env(k) : undefined),
         clock: () => Date.now() / 1000,
         arena_bytes: () => 0,
+        type: (x) => (Array.isArray(x) ? 'list' : (x instanceof Map ? 'map' : typeof x)),
+        int: (x) => Math.trunc(Number(x) || 0), float: (x) => Number(x) || 0, str: (x) => fmt(x),
+        floor: Math.floor, ceil: Math.ceil, tan: Math.tan, log: Math.log,
+        upper: (s) => String(s).toUpperCase(), lower: (s) => String(s).toLowerCase(), trim: (s) => String(s).trim(),
+        split: (s, sep) => String(s).split(sep === undefined ? '' : sep),
+        join: (l, sep) => l.map(fmt).join(sep === undefined ? ',' : sep),
+        contains: (x, y) => Array.isArray(x) ? x.some((v) => v === y) : (x instanceof Map ? x.has(y) : String(x).includes(String(y))),
+        index_of: (x, y) => Array.isArray(x) ? x.indexOf(y) : String(x).indexOf(String(y)),
+        substr: (s, a, b) => b === undefined ? String(s).slice(a) : String(s).slice(a, b),
+        replace: (s, a, b) => String(s).split(String(a)).join(String(b)),
+        starts_with: (s, p) => String(s).startsWith(String(p)), ends_with: (s, p) => String(s).endsWith(String(p)),
+        repeat: (s, n) => String(s).repeat(Math.max(0, Math.trunc(n))),
         push: (l, v) => { l.push(v); return l; },
         pop: (l) => l.pop(),
         unshift: (l, v) => { l.unshift(v); return l; },
         set: (l, i, v) => { l[i] = v; return l; },
         remove_at: (l, i) => { l.splice(i, 1); return l; },
         rand: (l) => l[Math.floor(Math.random() * l.length)],
+        shift: (l) => l.shift(),
+        insert: (l, i, v) => { l.splice(Math.trunc(i), 0, v); return l; },
+        remove: (l, v) => { const i = l.indexOf(v); if (i >= 0) l.splice(i, 1); return l; },
+        reverse: (l) => Array.isArray(l) ? l.slice().reverse() : String(l).split('').reverse().join(''),
+        sort: (l) => l.slice().sort((a, b) => (typeof a === 'number' && typeof b === 'number') ? a - b : (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)),
+        range: (a, b, st) => { const out = []; st = st || 1; if (b === undefined) { b = a; a = 0; } if (st > 0) { for (let i = a; i < b; i += st) out.push(i); } else { for (let i = a; i > b; i += st) out.push(i); } return out; },
+        sum: (l) => l.reduce((s, v) => s + Number(v || 0), 0),
+        min_of: (l) => Math.min.apply(null, l), max_of: (l) => Math.max.apply(null, l),
+        keys: (m) => Array.from(m.keys()), values: (m) => Array.from(m.values()),
+        has: (m, k) => m.has(k), get: (m, k, d) => m.has(k) ? m.get(k) : (d === undefined ? undefined : d),
+        put: (m, k, v) => { m.set(k, v); return m; }, del: (m, k) => { m.delete(k); return m; },
+        input: () => '',
         clear: () => { if (options.host && options.host.clear) options.host.clear(); return undefined; },
         sleep: (ms) => { if (options.host && options.host.sleep) options.host.sleep(ms); return undefined; },
         key: () => (options.host && options.host.key ? options.host.key() : ''),
       };
       return b;
     }
-    function fmt(v) { if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(round2(v)); return String(v); }
+    function fmt(v) { if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(round2(v)); if (Array.isArray(v)) return '[' + v.map(fmt).join(', ') + ']'; if (v instanceof Map) { const parts = []; for (const [k, val] of v) parts.push(k + ': ' + fmt(val)); return '{' + parts.join(', ') + '}'; } return String(v); }
     function round2(x) { return Math.round(x * 1e4) / 1e4; }
 
     try {

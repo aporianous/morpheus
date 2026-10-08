@@ -93,6 +93,24 @@ owns the keyboard and the clock and Morpheus owns the logic. See `examples/`:
 `notes.morph` (a file summariser) and **`snake.morph`** (a full Snake game —
 10 levels, wandering enemies, god mode).
 
+## Language reference
+The full language is documented in [`docs/LANGUAGE.md`](docs/LANGUAGE.md):
+`when` / `dream when` / `dream` (if/elif/else), `loop`, `for … in` with
+`break` / `continue`, ternary `c ? a : b`, lists `[..]` with indexing and
+slicing `a[i:j]`, maps `{ "k": v }` with `keys` / `has` / `put` / `get`, ranges
+`a..b`, member sugar (`s.upper()` ≡ `upper(s)`), `prophesy`, `arena`, modules
+(`import`) and C FFI (`extern`), backed by a full standard library.
+
+## Conformance
+The interpreter and the native backend are held to the same behavior:
+```
+node conformance.js     # builds every example natively, diffs vs the interpreter
+node test.js            # language basics
+```
+`conformance.js` compiles each program with the native backend and compares its
+output to the reference interpreter — proving the two agree. `forecast` and
+`arena` are reported as RNG/arena-specific (their outputs legitimately differ).
+
 ## Extend it
 See [`docs/EXTENDING.md`](docs/EXTENDING.md). The base hook:
 ```js
@@ -107,9 +125,10 @@ runMorpheus(src, { builtins: { double: (x) => x * 2 } });
 | `morphc.js` | native backend — compiles Morpheus → C++ |
 | `runtime/morph_rt.h` | the native runtime, inlined into each build |
 | `morph.js` | CLI — `run` a program, `play` a game, `build` a native binary |
+| `conformance.js` | proves interpreter ↔ native parity across the suite |
 | `index.html` | interactive tutorial + live playground |
 | `stdlib/` | `.morph` standard library |
-| `docs/` | spec, keywords, tutorial, API reference, extending |
+| `docs/` | spec, language reference, tutorial, API reference, extending |
 | `examples/` | sample apps, incl. a full `snake.morph` game |
 
 ## Status
