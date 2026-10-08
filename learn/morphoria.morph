@@ -428,7 +428,7 @@ sovereign draw_gate_ready() {
     print("")
     print("  P practice more      ENTER continue")
     print("")
-    print("B back   Q quit")
+    print("B back to map   Q quit")
 }
 
 sovereign draw_gate_shaky() {
@@ -439,7 +439,7 @@ sovereign draw_gate_shaky() {
     print("")
     print("  R quick review       ENTER continue anyway")
     print("")
-    print("B back   Q quit")
+    print("B back to map   Q quit")
 }
 
 sovereign draw_review() {
@@ -544,7 +544,7 @@ sovereign frame(k) {
             }
             save()
         }
-        when k == "b" { let screen = "fb" }
+        when k == "b" { let screen = "map" }
     }
     dream when screen == "gate_shaky" {
         when k == "r" { let screen = "review" }
@@ -562,7 +562,7 @@ sovereign frame(k) {
             }
             save()
         }
-        when k == "b" { let screen = "fb" }
+        when k == "b" { let screen = "map" }
     }
     dream when screen == "review" {
         when (k == "\n") or (k == " ") { let screen = "gate_ready" }
