@@ -85,7 +85,7 @@ function namesStmt(s, acc) {
     case 'ExprStmt': namesExpr(s.expr, acc); break;
     case 'If': namesExpr(s.cond, acc); namesIn(s.body, acc); if (s.alt) namesIn(s.alt, acc); break;
     case 'While': namesExpr(s.cond, acc); namesIn(s.body, acc); break;
-    case 'ForIn': acc.add(s.name); namesExpr(s.iter, acc); namesIn(s.body, acc); break;
+    case 'ForIn': acc.add(s.name); if (s.name2) acc.add(s.name2); namesExpr(s.iter, acc); namesIn(s.body, acc); break;
     case 'Break': case 'Continue': break;
     case 'Return': namesExpr(s.expr, acc); break;
     case 'Heal': namesIn(s.body, acc); if (s.alt) namesIn(s.alt, acc); break;
@@ -183,7 +183,9 @@ function emitStmt(s) {
     case 'Heal': return emitHeal(s);
     case 'Block': return '{\n' + emitBlock(s.body) + '\n}';
     case 'Arena': { CTX.arena = (CTX.arena || 0) + 1; const ab = emitBlock(s.body); CTX.arena--; return '{ RtArena _ar;\n' + ab + '\n}'; }
-    case 'ForIn': { CTX.forN = (CTX.forN || 0) + 1; const it = '_it' + CTX.forN; const body = emitBlock(s.body); return '{ Value ' + it + ' = ' + emitExpr(s.iter) + '; if (' + it + '.k == Value::STR) { for (char _c : ' + it + '.s) { v_' + s.name + ' = Value(std::string(1, _c));\n' + body + '\n} } else { for (size_t _i = 0; _i < ' + it + '.l->size(); ++_i) { v_' + s.name + ' = (*' + it + '.l)[_i];\n' + body + '\n} } }'; }
+    case 'ForIn': { CTX.forN = (CTX.forN || 0) + 1; const it = '_it' + CTX.forN; const body = emitBlock(s.body);
+      if (s.name2) return '{ Value ' + it + ' = ' + emitExpr(s.iter) + '; if (' + it + '.k == Value::MAP) { for (auto& _kv : *' + it + '.m) { v_' + s.name + ' = Value(_kv.first); v_' + s.name2 + ' = _kv.second;\n' + body + '\n} } else if (' + it + '.k == Value::STR) { for (size_t _i = 0; _i < ' + it + '.s.size(); ++_i) { v_' + s.name + ' = Value((double)_i); v_' + s.name2 + ' = Value(std::string(1, ' + it + '.s[_i]));\n' + body + '\n} } else { for (size_t _i = 0; _i < ' + it + '.l->size(); ++_i) { v_' + s.name + ' = Value((double)_i); v_' + s.name2 + ' = (*' + it + '.l)[_i];\n' + body + '\n} } }';
+      return '{ Value ' + it + ' = ' + emitExpr(s.iter) + '; if (' + it + '.k == Value::STR) { for (char _c : ' + it + '.s) { v_' + s.name + ' = Value(std::string(1, _c));\n' + body + '\n} } else { for (size_t _i = 0; _i < ' + it + '.l->size(); ++_i) { v_' + s.name + ' = (*' + it + '.l)[_i];\n' + body + '\n} } }'; }
     case 'Break': return 'break;';
     case 'Continue': return 'continue;';
     case 'Noop': return ';';

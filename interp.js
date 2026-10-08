@@ -79,7 +79,7 @@
       if (isKw('arena')) { next(); return { type: 'Arena', body: block() }; }
       if (isKw('break')) { next(); return { type: 'Break' }; }
       if (isKw('continue')) { next(); return { type: 'Continue' }; }
-      if (isKw('for')) { next(); const name = next().value; if (!isKw('in')) throw new Error('expected "in" after for variable'); next(); const iter = expression(); return { type: 'ForIn', name, iter, body: block() }; }
+      if (isKw('for')) { next(); const name = next().value; let name2 = null; if (isOp(',')) { next(); name2 = next().value; } if (!isKw('in')) throw new Error('expected "in" after for variable'); next(); const iter = expression(); return { type: 'ForIn', name, name2, iter, body: block() }; }
       // assignment (target may be a name, a field `x.y`, or an index `x[i]`)
       { const lhs = expression();
         if (isOp('=')) {
@@ -265,7 +265,14 @@
         case 'ExprStmt': return evalExpr(s.expr);
         case 'If': if (truthy(evalExpr(s.cond))) return execBlockValue(s.body); else if (s.alt) return execBlockValue(s.alt); return undefined;
         case 'While': { let r; let guard = 0; while (truthy(evalExpr(s.cond))) { try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) break; if (e[CONT]) { if (++guard > 1e7) throw new Error('loop limit exceeded'); continue; } throw e; } if (++guard > 1e7) throw new Error('loop limit exceeded'); } return r; }
-        case 'ForIn': { const it = evalExpr(s.iter); let r; const seq = typeof it === 'string' ? it.split('') : it; for (const v of seq) { env.vars[s.name] = v; try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) break; if (e[CONT]) continue; throw e; } } return r; }
+        case 'ForIn': { const it = evalExpr(s.iter); let r;
+          if (s.name2) {
+            const step = (k, v) => { env.vars[s.name] = k; env.vars[s.name2] = v; try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) return 'brk'; if (e[CONT]) return null; throw e; } return null; };
+            if (it instanceof Map) { for (const k of Array.from(it.keys()).sort()) { if (step(k, it.get(k)) === 'brk') break; } }
+            else { const seq = typeof it === 'string' ? it.split('') : it; for (let i = 0; i < seq.length; i++) { if (step(i, seq[i]) === 'brk') break; } }
+            return r;
+          }
+          const seq = typeof it === 'string' ? it.split('') : it; for (const v of seq) { env.vars[s.name] = v; try { r = execBlockValue(s.body); } catch (e) { if (e[BRK]) break; if (e[CONT]) continue; throw e; } } return r; }
         case 'Break': { const e = {}; e[BRK] = true; throw e; }
         case 'Continue': { const e = {}; e[CONT] = true; throw e; }
         case 'Return': { const e = {}; e[RET] = true; e.value = evalExpr(s.expr); throw e; }
