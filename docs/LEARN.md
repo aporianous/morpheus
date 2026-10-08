@@ -1,13 +1,13 @@
-# Learn Morpheus — the interactive course
+# Morphoria — learn to code by playing
 
-A **Duolingo-style** course that teaches the whole language, written *in Morpheus*.
-Earn XP, keep a streak, unlock units, and finish by **building a real app that is
-graded by real tests before it compiles**.
+**Morphoria**, an Aporia Nous game, teaches the whole language through short,
+fun, self-paced units. Earn XP, build combos, keep your lives, climb the ranks,
+and finish by **building a real app that is graded by real tests before it runs**.
 
 ## Play the course
 
 ```
-node morph.js play learn/morpheus_duo.morph
+node morph.js play learn/morphoria.morph
 ```
 
 | key | does |

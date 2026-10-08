@@ -7,13 +7,13 @@ themselves at runtime, values that carry a **confidence**, and a predictive
 `prophesy` primitive. It is **open-core** — the language and its tooling are
 open; a separate production runtime is private.
 
-## Learn it — interactive course (Duolingo-style)
-Play a course written in Morpheus itself — earn XP, keep a streak, unlock units,
-and finish in a **build workspace that grades your code with real tests before it
-compiles**:
+## Learn it — Morphoria, an Aporia Nous game
+Play a course that teaches the language one small step at a time — earn XP, build
+combos, keep your lives, climb the ranks, and finish in a **build workspace that
+grades your code with real tests before it compiles**:
 
 ```
-node morph.js play learn/morpheus_duo.morph
+node morph.js play learn/morphoria.morph
 ```
 
 See `docs/LEARN.md`, then build real apps in `examples/apps/`.

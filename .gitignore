@@ -8,6 +8,6 @@ examples/apps/*.cpp
 examples/_div/
 learn/*.cpp
 learn/learner.morph
-learn/duo_save.txt
+learn/morphoria_save.txt
 # deps
 node_modules/
