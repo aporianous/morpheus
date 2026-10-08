@@ -188,7 +188,7 @@
         case 'Un': { const v = evalExpr(node.e); return node.op === '-' ? -v : !truthy(v); }
         case 'Call': return callF(node.callee, node.args.map(evalExpr));
         case 'Member': { const o = evalExpr(node.obj); return o[node.name]; }
-        case 'Index': { const o = evalExpr(node.obj), i = evalExpr(node.idx); if (o instanceof Map) return o.get(i); return o[i]; }
+        case 'Index': { const o = evalExpr(node.obj), i = evalExpr(node.idx); if (o instanceof Map) { if (!o.has(i)) throw new Error('KeyError: ' + fmt(i)); return o.get(i); } if (Array.isArray(o)) { if (i < 0 || i >= o.length) throw new Error('IndexError: list idx ' + i + ' size ' + o.length); return o[i]; } if (typeof o === 'string') { if (i < 0 || i >= o.length) throw new Error('IndexError: str idx ' + i + ' size ' + o.length); return o[i]; } throw new Error('IndexError: not indexable'); }
         case 'Range': { const a = evalExpr(node.a), b = evalExpr(node.b); const out = []; for (let i = a; i < b; i++) out.push(i); return out; }
         case 'Map': { const m = new Map(); for (const p of node.pairs) { const kk = evalExpr(p.key); m.set(typeof kk === 'string' ? kk : fmt(kk), evalExpr(p.value)); } return m; }
         case 'Slice': { const o = evalExpr(node.obj); const s = node.start ? evalExpr(node.start) : 0; const e = node.end ? evalExpr(node.end) : o.length; return o.slice(s, e); }
@@ -198,7 +198,7 @@
           const vals = [];
           for (let i = 0; i < node.samples; i++) { const r = execBlockValue(node.body); if (typeof r === 'number') vals.push(r); }
           const mean = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
-          return round2(mean);
+          return mean;
         }
         default: throw new Error('cannot evaluate ' + node.type);
       }
@@ -312,7 +312,7 @@
         range: (a, b, st) => { const out = []; st = st || 1; if (b === undefined) { b = a; a = 0; } if (st > 0) { for (let i = a; i < b; i += st) out.push(i); } else { for (let i = a; i > b; i += st) out.push(i); } return out; },
         sum: (l) => l.reduce((s, v) => s + Number(v || 0), 0),
         min_of: (l) => Math.min.apply(null, l), max_of: (l) => Math.max.apply(null, l),
-        keys: (m) => Array.from(m.keys()), values: (m) => Array.from(m.values()),
+        keys: (m) => Array.from(m.keys()).sort(), values: (m) => Array.from(m.keys()).sort().map((k) => m.get(k)),
         has: (m, k) => m.has(k), get: (m, k, d) => m.has(k) ? m.get(k) : (d === undefined ? undefined : d),
         put: (m, k, v) => { m.set(k, v); return m; }, del: (m, k) => { m.delete(k); return m; },
         input: () => '',
@@ -322,7 +322,7 @@
       };
       return b;
     }
-    function fmt(v) { if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(round2(v)); if (Array.isArray(v)) return '[' + v.map(fmt).join(', ') + ']'; if (v instanceof Map) { const parts = []; for (const [k, val] of v) parts.push(k + ': ' + fmt(val)); return '{' + parts.join(', ') + '}'; } return String(v); }
+    function fmt(v) { if (typeof v === 'number') { if (Number.isInteger(v)) return String(v); let s = v.toFixed(6).replace(/0+$/, '').replace(/\.$/, ''); return s.charAt(0) === '.' ? '0' + s : s; } if (Array.isArray(v)) return '[' + v.map(fmt).join(', ') + ']'; if (v instanceof Map) { const parts = []; for (const k of Array.from(v.keys()).sort()) parts.push(k + ': ' + fmt(v.get(k))); return '{' + parts.join(', ') + '}'; } return String(v); }
     function round2(x) { return Math.round(x * 1e4) / 1e4; }
 
     try {

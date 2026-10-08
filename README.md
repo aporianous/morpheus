@@ -104,12 +104,16 @@ slicing `a[i:j]`, maps `{ "k": v }` with `keys` / `has` / `put` / `get`, ranges
 ## Conformance
 The interpreter and the native backend are held to the same behavior:
 ```
+node divergence.js      # edge cases + a deterministic fuzzer, interp vs native
 node conformance.js     # builds every example natively, diffs vs the interpreter
 node test.js            # language basics
 ```
-`conformance.js` compiles each program with the native backend and compares its
-output to the reference interpreter — proving the two agree. `forecast` and
-`arena` are reported as RNG/arena-specific (their outputs legitimately differ).
+`divergence.js` is the conformance **spec**: it runs a battery of edge-case
+programs (map order, number formatting, indexing, slicing, errors, …) plus a
+deterministic fuzzer through **both** backends and requires them to agree — on
+output when they succeed, and on *failing* when they fail (error parity). Any
+divergence is a bug. `conformance.js` does the same for the full example set
+(`forecast` / `arena` are RNG/arena-specific).
 
 ## Extend it
 See [`docs/EXTENDING.md`](docs/EXTENDING.md). The base hook:

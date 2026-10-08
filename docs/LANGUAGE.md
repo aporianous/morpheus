@@ -115,6 +115,40 @@ import "text.morph"                       # load a module
 extern sqrt(x: float) -> float            # bind a C function (link with -l m)
 ```
 
+## Semantics (normative)
+
+These rules are guaranteed identical on the reference interpreter and the
+native backend, and are enforced by `divergence.js`.
+
+**Numbers.** One numeric type (IEEE-754 double). `/` always yields a real
+(`7/2 == 3.5`). Integers print with no decimal point; non-integers print with at
+most 6 fractional digits and trailing zeros trimmed (`0.5`, `1.25`, `0.333333`).
+
+**Truthiness.** `false`, `0`, `""`, `[]`, `{}` are false; everything else true.
+
+**Equality.** `==` / `!=` compare by value for numbers, strings and booleans;
+lists and maps compare by identity (a collection equals itself). Ordering
+`< > <= >=` is defined for numbers.
+
+**Map order.** A map's `keys`, `values`, `print` and `for … in m.keys()` iterate
+in **ascending key order** (lexicographic). Both backends guarantee this.
+
+**Indexing.** `a[i]` requires an integer `i` in `[0, length)`. Out of range is a
+runtime **IndexError**; negative indices are errors (no wrap). `str[i]` yields a
+1-character string. `m[k]` requires the key to exist (else **KeyError**) — use
+`m.get(k, default)` to supply a fallback.
+
+**Slicing.** `a[i:j]` clamps (`i<0→0`, `j>len→len`, `j<i`→empty) and never errors.
+Omitted bounds default to `0` / `length`.
+
+**Mutation.** `put` / `del` / `push` / `insert` / `remove` / `set` mutate the
+collection in place and return it. Numbers and strings are value-like.
+
+**Errors.** A runtime error prints `Error: <message>` and exits non-zero. The two
+backends agree on *whether* an operation errors; the message text is
+implementation-defined. Free (undeclared) names are a runtime error in the
+interpreter and a compile-time error in the native backend.
+
 ## Grammar (informal)
 ```
 program   := (import | extern | funct | stmt)*

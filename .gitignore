@@ -3,5 +3,6 @@ summary.txt
 # native build artifacts
 *.exe
 examples/*.cpp
+examples/_div/
 # deps
 node_modules/

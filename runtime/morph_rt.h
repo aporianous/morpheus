@@ -8,6 +8,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -63,7 +64,7 @@ inline double rt_num(const Value& v) {
 }
 inline std::string rt_str(const Value& v) {
   if (v.k == Value::STR) return v.s;
-  if (v.k == Value::NUM) { double x = v.n; if (x == (long long)x) return std::to_string((long long)x); return std::to_string(x); }
+  if (v.k == Value::NUM) { double x = v.n; if (x == (long long)x && std::fabs(x) < 1e15) return std::to_string((long long)x); char b[64]; std::snprintf(b, sizeof b, "%.6f", x); std::string t(b); size_t dot = t.find('.'); if (dot != std::string::npos) { size_t last = t.find_last_not_of('0'); if (last == dot) last = dot - 1; t.erase(last + 1); } return t; }
   if (v.k == Value::BOOL) return v.b ? "true" : "false";
   if (v.k == Value::MAP) { std::string out = "{"; size_t i = 0; for (auto& kv : *v.m) { if (i++) out += ", "; out += kv.first + ": " + rt_str(kv.second); } return out + "}"; }
   std::string out = "[";

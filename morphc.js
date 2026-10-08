@@ -333,7 +333,7 @@ function compileToCpp(absPath) {
 
   const mainFn = out.funcs.find((f) => f.name === 'main');
   const frameFn = out.funcs.find((f) => f.name === 'frame');
-  code += 'int main(int argc, char** argv) { (void)argc; (void)argv;\n';
+  code += 'int main(int argc, char** argv) { (void)argc; (void)argv;\n  try {\n';
   for (const s of out.tops) code += emitStmt(s) + '\n';
   if (mainFn) {
     const locals = new Set(); namesIn(mainFn.body, locals);
@@ -350,6 +350,7 @@ function compileToCpp(absPath) {
     code += '    if (_s == "over" || _s == "win") { std::cout << (_s == "win" ? "\\n*** YOU WIN ***\\n" : "\\n*** GAME OVER ***\\n"); break; }\n';
     code += '    rt_sleep(Value(_tick));\n  }\n';
   }
+  code += '  } catch (const std::exception& e) { std::cout << "Error: " << e.what() << std::endl; return 1; }\n';
   code += '  return 0;\n}\n';
   return code;
 }
