@@ -396,7 +396,7 @@ function compileToCpp(absPath) {
     code += '  double _tick = 140;\n  for (;;) {\n';
     code += '    Value _st = ' + fnName('frame') + '(rt_key());\n';
     code += '    std::string _s = rt_str(_st);\n';
-    code += '    if (_s == "over" || _s == "win") { std::cout << (_s == "win" ? "\\n*** YOU WIN ***\\n" : "\\n*** GAME OVER ***\\n"); break; }\n';
+    code += '    if (_s == "over" || _s == "win") { std::cout << (_s == "win" ? "\\n*** YOU WIN ***\\n" : "\\n*** session ended ***\\n"); break; }\n';
     code += '    rt_sleep(Value(_tick));\n  }\n';
   }
   code += '  } catch (const std::exception& e) { std::cout << "Error: " << e.what() << std::endl; return 1; }\n';

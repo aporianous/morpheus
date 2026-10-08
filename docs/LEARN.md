@@ -30,10 +30,14 @@ node morph.js play learn/morphoria.morph
 | `W` / `S` | move between units |
 | `Enter` | select / continue |
 | `1` `2` `3` | answer |
-| `R` | reset progress |
+| `H` | help |
+| `X` | badges |
 | `Q` | quit |
 
-Progress (XP, streak, cleared units) is saved to `learn/morphoria_save.txt`
+Each chapter shows **stars** (up to three) for how well you know its ideas, and you
+earn **badges** for milestones — clearing your first chapter, a 5-answer combo, an
+all-correct review, reaching a new rank, and beating a Boss Review. Progress (XP,
+badges, stars, and cleared chapters) is saved to `learn/morphoria_save.txt`
 between sessions.
 
 ## The units

@@ -99,7 +99,6 @@ import "morphoria_core.morph"
 
 let strength = {}
 let last_seen = {}
-let shaky = []
 let badges = []
 
 sovereign concepts_of(unit) {
@@ -149,18 +148,18 @@ sovereign save() {
     let bs = join(badges, ",")
     let cs = all_concepts()
     let parts = []
-    let i = 0
-    loop i < len(cs) {
-        let c = cs[i]
+    let _i = 0
+    loop _i < len(cs) {
+        let c = cs[_i]
         let seen = 0
         when has(last_seen, c) { let seen = last_seen[c] }
         let parts = push(parts, c ++ ":" ++ str(strength_of(c)) ++ ":" ++ str(seen))
-        let i = i + 1
+        let _i = _i + 1
     }
     let cstr = []
     let ci = 0
     loop ci < len(cleared) { let cstr = push(cstr, str(cleared[ci])) let ci = ci + 1 }
-    let line = str(xp) ++ "|" ++ str(best) ++ "|" ++ bs ++ "|" ++ join(parts, ";") ++ "|" ++ join(cstr, ",")
+    let line = str(xp) ++ "|" ++ str(best) ++ "|" ++ bs ++ "|" ++ join(parts, ";") ++ "|" ++ join(cstr, ",") ++ "|" ++ str(clock())
     heal { write_file("learn/morphoria_save.txt", line) } dream { }
 }
 
@@ -172,12 +171,13 @@ let last_stars = 0
 let cleared = []
 let ever_wrong = {}
 let ustars = []
-let i = 0
-loop i < len(units) { let cleared = push(cleared, 0) let i = i + 1 }
+let gi = 0
+loop gi < len(units) { let cleared = push(cleared, 0) let gi = gi + 1 }
 let si = 0
 loop si < len(units) { let ustars = push(ustars, 0) let si = si + 1 }
 
 let save_str = ""
+let days = 0
 heal { save_str = read_file("learn/morphoria_save.txt") } dream { save_str = "" }
 when len(save_str) > 0 {
     when contains(save_str, "|") {
@@ -205,6 +205,12 @@ when len(save_str) > 0 {
                 let q = q + 1
             }
         }
+        when len(top) >= 6 {
+            let ts = float(top[5])
+            let d = (clock() - ts) / 86400.0
+            when d < 0 { let d = 0 }
+            let days = d
+        }
     } dream {
         let legacy = split(trim(save_str), ",")
         when len(legacy) >= 1 { let xp = int(legacy[0]) }
@@ -221,9 +227,7 @@ let di = 0
 let dcs = all_concepts()
 loop di < len(dcs) {
     let c = dcs[di]
-    let seen = 0
-    when has(last_seen, c) { let seen = last_seen[c] }
-    set_strength(c, apply_decay(strength_of(c), seen))
+    set_strength(c, apply_decay(strength_of(c), days))
     let di = di + 1
 }
 
@@ -239,6 +243,7 @@ let ri = 0
 let solved_review = {}
 let rev_all = 1
 let rev_is_boss = 0
+let rev_from_shaky = 0
 
 sovereign unlocked(n) {
     when n == 0 { signal true }
@@ -289,7 +294,7 @@ sovereign starter_text() {
 }
 
 sovereign write_starter() {
-    heal { write_file("learn/learner.morph", starter_text()) } dream { let msg = "Could not write the file." }
+    heal { write_file("learn/learner.morph", starter_text()) } dream { let _msg = "Could not write the file." }
 }
 
 sovereign draw_title() {
@@ -316,22 +321,22 @@ sovereign draw_map() {
     clear()
     print("MORPHORIA      XP " ++ str(xp) ++ "   rank " ++ rank(xp) ++ "   best combo streak " ++ str(best))
     print("----------------------------------------------------------")
-    let k = 0
-    loop k < len(units) {
-        let indent = repeat("  ", k % 3)
+    let _k = 0
+    loop _k < len(units) {
+        let indent = repeat("  ", _k % 3)
         let node = "( )"
-        when cleared[k] == 1 { let node = "[*]" }
-        when (cleared[k] == 0) and (not unlocked(k)) { let node = "[x]" }
+        when cleared[_k] == 1 { let node = "[*]" }
+        when (cleared[_k] == 0) and (not unlocked(_k)) { let node = "[x]" }
         let cur = "  "
-        when k == mi { let cur = "> " }
+        when _k == mi { let cur = "> " }
         let tail = ""
-        when cleared[k] == 1 { let tail = "   cleared" }
-        print(indent ++ cur ++ node ++ " " ++ str(k + 1) ++ ". " ++ units[k]["name"] ++ tail)
-        let k = k + 1
+        when cleared[_k] == 1 { let tail = "   cleared" }
+        print(indent ++ cur ++ node ++ " " ++ str(_k + 1) ++ ". " ++ units[_k]["name"] ++ "  " ++ stars_str(ustars[_k]) ++ tail)
+        let _k = _k + 1
     }
     print("----------------------------------------------------------")
     when len(msg) > 0 { print(msg) }
-    print("W/S move    ENTER play    Q quit")
+    print("W/S move    ENTER play    X badges    Q quit")
 }
 
 sovereign draw_ex() {
@@ -444,6 +449,10 @@ sovereign weakest_of(unit) {
         let i = i + 1
     }
     signal worst
+}
+
+sovereign pretty_concept(c) {
+    signal replace(c, "-", " ")
 }
 
 whisper review buckets (read-only): weak <0.60 (not ready), mid 0.60-0.80, strong >=0.80.
@@ -597,7 +606,7 @@ sovereign draw_gate_shaky() {
     clear()
     print(units[u]["name"] ++ " — almost!   stars: " ++ stars_str(ustars[u]))
     print("")
-    print("   (o_o)  Morphy: let's shore up " ++ weakest_of(units[u]) ++ ".")
+    print("   (o_o)  Morphy: let's shore up " ++ pretty_concept(weakest_of(units[u])) ++ ".")
     print("")
     print("  R quick review       ENTER continue anyway")
     print("")
@@ -606,6 +615,10 @@ sovereign draw_gate_shaky() {
 
 sovereign draw_review() {
     clear()
+    when len(rev_items) == 0 {
+        print("Nothing to review — ENTER to go back.")
+        signal ""
+    }
     when rev_is_boss == 1 {
         print("Boss review — " ++ units[u]["name"] ++ "   (" ++ str(ri + 1) ++ "/" ++ str(len(rev_items)) ++ ")")
     } dream {
@@ -617,8 +630,8 @@ sovereign draw_review() {
     print("")
     when len(it["code"]) > 0 { print("   " ++ it["code"]) print("") }
     let a = it["opts"]
-    let i = 0
-    loop i < len(a) { print("  [" ++ str(i + 1) ++ "] " ++ a[i]) let i = i + 1 }
+    let _i = 0
+    loop _i < len(a) { print("  [" ++ str(_i + 1) ++ "] " ++ a[_i]) let _i = _i + 1 }
     print("")
     print("Pick 1-" ++ str(len(a)) ++ ".")
 }
@@ -630,10 +643,25 @@ sovereign draw_review_done() {
     print("ENTER continue")
 }
 
+sovereign draw_badges() {
+    clear()
+    print("BADGES")
+    print("----------------------------------------------------------")
+    when len(badges) == 0 {
+        print("  No badges yet.")
+    } dream {
+        let bi = 0
+        loop bi < len(badges) { print("  * " ++ badges[bi]) let bi = bi + 1 }
+    }
+    print("")
+    print("ANY KEY to go back")
+}
+
 sovereign draw() {
     when screen == "title" { draw_title() }
     dream when screen == "map" { draw_map() }
     dream when screen == "help" { draw_help() }
+    dream when screen == "badges" { draw_badges() }
     dream when screen == "ex" { draw_ex() }
     dream when screen == "fb" { draw_fb() }
     dream when screen == "gate_ready" { draw_gate_ready() }
@@ -654,10 +682,14 @@ sovereign frame(k) {
     dream when screen == "help" {
         when k != "" { let screen = "map" }
     }
+    dream when screen == "badges" {
+        when k != "" { let screen = "map" }
+    }
     dream when screen == "map" {
         when k == "w" { let mi = (mi + len(units) - 1) % len(units) let msg = "" }
         when k == "s" { let mi = (mi + 1) % len(units) let msg = "" }
         when k == "h" { let screen = "help" }
+        when k == "x" { let screen = "badges" }
         when (k == "\n") or (k == " ") {
             when unlocked(mi) {
                 let u = mi
@@ -678,7 +710,6 @@ sovereign frame(k) {
             let first_try = not has(ever_wrong, key)
             let correct = int(k) == ex["ans"]
             when not correct { let ever_wrong = put(ever_wrong, key, 1) }
-            let pre_str = strength_of(c)
             set_strength(c, strength_update(strength_of(c), correct, tier_index(ex["tier"]), first_try))
             when correct {
                 let combo = combo + 1
@@ -687,13 +718,11 @@ sovereign frame(k) {
                 let xp = xp + tier_xp(ex["tier"]) + bonus
                 when combo > best { let best = combo }
                 let fbok = true
-                let badges = award(badges, "First Steps")
                 when combo >= 5 { let badges = award(badges, "Combo x5") }
-                when pre_str < 0.4 { let badges = award(badges, "Comeback") }
+                when rank(xp) == "Shapeshifter" { let badges = award(badges, "Shapeshifter") }
             } dream {
                 let combo = 0
                 let fbok = false
-                when not contains(shaky, c) { let shaky = push(shaky, c) }
             }
             let screen = "fb"
             save()
@@ -721,12 +750,16 @@ sovereign frame(k) {
             let solved_review = {}
             let rev_all = 1
             let rev_is_boss = 0
+            let rev_from_shaky = 0
             let screen = "review"
         }
         when (k == "\n") or (k == " ") {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
             let xp = xp + 25
+            when u == 0 { let badges = award(badges, "First Steps") }
+            when stars_of(readiness_of(units[u])) == 3 { let badges = award(badges, "Full Sweep") }
+            when rank(xp) == "Shapeshifter" { let badges = award(badges, "Shapeshifter") }
             when u >= len(units) - 1 {
                 let screen = "workspace"
                 let wrote = false
@@ -736,6 +769,7 @@ sovereign frame(k) {
                 let solved_review = {}
                 let rev_all = 1
                 let rev_is_boss = 1
+                let rev_from_shaky = 0
                 let screen = "review"
             } dream {
                 let u = u + 1
@@ -753,13 +787,16 @@ sovereign frame(k) {
             let solved_review = {}
             let rev_all = 1
             let rev_is_boss = 0
+            let rev_from_shaky = 1
             let screen = "review"
         }
         when (k == "\n") or (k == " ") {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
             let xp = xp + 25
-            when ustars[u] == 0 { let badges = award(badges, "Shapeshifter") }
+            when u == 0 { let badges = award(badges, "First Steps") }
+            when stars_of(readiness_of(units[u])) == 3 { let badges = award(badges, "Full Sweep") }
+            when rank(xp) == "Shapeshifter" { let badges = award(badges, "Shapeshifter") }
             when u >= len(units) - 1 {
                 let screen = "workspace"
                 let wrote = false
@@ -769,6 +806,7 @@ sovereign frame(k) {
                 let solved_review = {}
                 let rev_all = 1
                 let rev_is_boss = 1
+                let rev_from_shaky = 0
                 let screen = "review"
             } dream {
                 let u = u + 1
@@ -780,27 +818,27 @@ sovereign frame(k) {
         when k == "b" { let screen = "map" }
     }
     dream when screen == "review" {
-        when ((k == "1") or (k == "2") or (k == "3") or (k == "4")) and (int(k) <= len(rev_items[ri]["opts"])) {
+        when len(rev_items) == 0 {
+            when (k == "\n") or (k == " ") {
+                let vals = readiness_of(units[u])
+                when is_ready(vals) { let screen = "gate_ready" } dream { let screen = "gate_shaky" }
+            }
+        } dream when ((k == "1") or (k == "2") or (k == "3") or (k == "4")) and (int(k) <= len(rev_items[ri]["opts"])) {
             let it = rev_items[ri]
             let correct = int(k) == it["ans"]
             let c = it["concept"]
             let key = "rev:" ++ c ++ str(ri)
             let first_try = not has(solved_review, key)
-            let pre_str = strength_of(c)
-            when not correct { let solved_review = put(solved_review, key, 1) }
-            set_strength(c, strength_update(strength_of(c), correct, tier_index(it["tier"]), first_try))
-            when correct {
-                let badges = award(badges, "First Steps")
-                when pre_str < 0.4 { let badges = award(badges, "Comeback") }
-            } dream {
+            when not correct {
+                let solved_review = put(solved_review, key, 1)
                 let rev_all = 0
             }
+            set_strength(c, strength_update(strength_of(c), correct, tier_index(it["tier"]), first_try))
             let ri = ri + 1
             let screen = "review"
             when ri >= len(rev_items) {
                 let vals = readiness_of(units[u])
                 let ustars = set(ustars, u, stars_of(vals))
-                when rev_all == 1 { let badges = award(badges, "Full Sweep") }
                 save()
                 let screen = "review_done"
             }
@@ -811,12 +849,14 @@ sovereign frame(k) {
             when rev_is_boss == 1 {
                 let badges = award(badges, "Boss Slayer")
                 let xp = xp + 50
+                when rank(xp) == "Shapeshifter" { let badges = award(badges, "Shapeshifter") }
                 let rev_is_boss = 0
                 let u = u + 1
                 let mi = u
                 let screen = "celebrate"
                 save()
             } dream {
+                when rev_from_shaky == 1 { let badges = award(badges, "Comeback") }
                 let vals = readiness_of(units[u])
                 when is_ready(vals) { let screen = "gate_ready" } dream { let screen = "gate_shaky" }
             }
