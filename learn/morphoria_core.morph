@@ -1,0 +1,14 @@
+whisper morphoria_core — pure mastery logic (no UI, no I/O).
+
+sovereign strength_update(cur, correct, tier_index, first_try) {
+    when correct {
+        let gain = 0.25 + 0.05 * tier_index
+        when first_try { let gain = gain + 0.10 }
+        let s = cur + gain
+        when s > 1.0 { let s = 1.0 }
+        signal s
+    }
+    let s = cur - 0.15
+    when s < 0.0 { let s = 0.0 }
+    signal s
+}

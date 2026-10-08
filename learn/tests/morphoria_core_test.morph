@@ -1,0 +1,14 @@
+import "../morphoria_core.morph"
+
+sovereign approx(a, b) {
+    signal abs(a - b) < 0.0001
+}
+
+sovereign main() {
+    assert(approx(strength_update(0.5, true, 0, true), 0.85), "easy correct first-try")
+    assert(approx(strength_update(0.5, true, 3, false), 0.90), "expert correct")
+    assert(approx(strength_update(0.5, false, 0, false), 0.35), "wrong")
+    assert(approx(strength_update(0.95, true, 3, true), 1.0), "clamp high")
+    assert(approx(strength_update(0.05, false, 0, false), 0.0), "clamp low")
+    print("core tests passed")
+}
