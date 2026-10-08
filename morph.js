@@ -122,7 +122,7 @@ runMorpheus(fs.readFileSync(abs, 'utf8'), Object.assign({}, common, {
       if (out.length) process.stdout.write(out.join('\n') + '\n');
       if (status === 'over' || status === 'win') {
         cleanup();
-        process.stdout.write('\n' + (status === 'win' ? '*** YOU WIN ***' : '*** GAME OVER ***') + '\n');
+        process.stdout.write('\n' + (status === 'win' ? '*** YOU WIN ***' : '*** session ended ***') + '\n');
         process.exit(0);
       }
     }, 140);

@@ -272,7 +272,8 @@ sovereign award(bs, name) {
 }
 
 sovereign hud() {
-    print("XP " ++ str(xp) ++ "  " ++ rank(xp) ++ "  " ++ units[u]["name"] ++ "  · " ++ str(len(badges)) ++ " badges")
+    let bword = len(badges) == 1 ? " badge" : " badges"
+    print("XP " ++ str(xp) ++ "  " ++ rank(xp) ++ "  " ++ units[u]["name"] ++ "  · " ++ str(len(badges)) ++ bword)
 }
 
 sovereign starter_text() {
@@ -714,12 +715,18 @@ sovereign frame(k) {
         }
     }
     dream when screen == "gate_ready" {
-        when k == "p" { let screen = "review_open" }
+        when k == "p" {
+            let rev_items = build_review(units[u])
+            let ri = 0
+            let solved_review = {}
+            let rev_all = 1
+            let rev_is_boss = 0
+            let screen = "review"
+        }
         when (k == "\n") or (k == " ") {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
             let xp = xp + 25
-            when ustars[u] == 0 { let badges = award(badges, "Shapeshifter") }
             when u >= len(units) - 1 {
                 let screen = "workspace"
                 let wrote = false
@@ -740,7 +747,14 @@ sovereign frame(k) {
         when k == "b" { let screen = "map" }
     }
     dream when screen == "gate_shaky" {
-        when k == "r" { let screen = "review_open" }
+        when k == "r" {
+            let rev_items = build_review(units[u])
+            let ri = 0
+            let solved_review = {}
+            let rev_all = 1
+            let rev_is_boss = 0
+            let screen = "review"
+        }
         when (k == "\n") or (k == " ") {
             let last_stars = ustars[u]
             let cleared = set(cleared, u, 1)
@@ -765,16 +779,8 @@ sovereign frame(k) {
         }
         when k == "b" { let screen = "map" }
     }
-    dream when screen == "review_open" {
-        let rev_items = build_review(units[u])
-        let ri = 0
-        let solved_review = {}
-        let rev_all = 1
-        let rev_is_boss = 0
-        let screen = "review"
-    }
     dream when screen == "review" {
-        when (k == "1") or (k == "2") or (k == "3") or (k == "4") {
+        when ((k == "1") or (k == "2") or (k == "3") or (k == "4")) and (int(k) <= len(rev_items[ri]["opts"])) {
             let it = rev_items[ri]
             let correct = int(k) == it["ans"]
             let c = it["concept"]

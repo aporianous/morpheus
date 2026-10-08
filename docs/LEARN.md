@@ -1,7 +1,7 @@
 # Morphoria — learn to code by playing
 
 **Morphoria**, an Aporia Nous game, teaches the whole language through short,
-fun, self-paced units. Earn XP, build combos, keep your lives, climb the ranks,
+fun, self-paced units. Earn XP, build combos, climb the ranks,
 and finish by **building a real app that is graded by real tests before it runs**.
 
 ## Morphoria
@@ -33,8 +33,8 @@ node morph.js play learn/morphoria.morph
 | `R` | reset progress |
 | `Q` | quit |
 
-Progress (XP, streak, cleared units) is saved to `learn/duo_save.txt` between
-sessions.
+Progress (XP, streak, cleared units) is saved to `learn/morphoria_save.txt`
+between sessions.
 
 ## The units
 
