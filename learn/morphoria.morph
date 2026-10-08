@@ -150,7 +150,10 @@ sovereign save() {
         let parts = push(parts, c ++ ":" ++ str(strength_of(c)) ++ ":" ++ str(seen))
         let i = i + 1
     }
-    let line = str(xp) ++ "|" ++ str(best) ++ "|" ++ bs ++ "|" ++ join(parts, ";")
+    let cstr = []
+    let ci = 0
+    loop ci < len(cleared) { let cstr = push(cstr, str(cleared[ci])) let ci = ci + 1 }
+    let line = str(xp) ++ "|" ++ str(best) ++ "|" ++ bs ++ "|" ++ join(parts, ";") ++ "|" ++ join(cstr, ",")
     heal { write_file("learn/morphoria_save.txt", line) } dream { }
 }
 
@@ -182,6 +185,14 @@ when len(save_str) > 0 {
                     let last_seen = put(last_seen, f[0], float(f[2]))
                 }
                 let r = r + 1
+            }
+        }
+        when len(top) >= 5 {
+            let cpart = split(top[4], ",")
+            let q = 0
+            loop (q < len(cpart)) and (q < len(cleared)) {
+                let cleared = set(cleared, q, int(cpart[q]))
+                let q = q + 1
             }
         }
     } dream {
