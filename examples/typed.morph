@@ -1,0 +1,18 @@
+whisper typed — statically-typed Morpheus, compiled to real C++ types.
+whisper int -> long long, float -> double, str -> std::string, bool -> bool.
+
+sovereign fib(n: int) -> int {
+    when n < 2 {
+        signal n
+    }
+    signal fib(n - 1) + fib(n - 2)
+}
+
+sovereign greet(name: str) -> str {
+    signal "Hello, " ++ name ++ "!"
+}
+
+sovereign main() {
+    print(fib(10))
+    print(greet("Perseus"))
+}

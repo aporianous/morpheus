@@ -31,6 +31,9 @@ struct Value {
   Value(): k(NUM), n(0), b(false) {}
   Value(double x): k(NUM), n(x), b(false) {}
   Value(int x): k(NUM), n((double)x), b(false) {}
+  Value(long long x): k(NUM), n((double)x), b(false) {}
+  Value(unsigned long long x): k(NUM), n((double)x), b(false) {}
+  Value(unsigned int x): k(NUM), n((double)x), b(false) {}
   Value(bool x): k(BOOL), n(0), b(x) {}
   Value(const char* x): k(STR), n(0), b(false), s(x) {}
   Value(const std::string& x): k(STR), n(0), b(false), s(x) {}

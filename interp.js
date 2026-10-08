@@ -5,8 +5,8 @@
   'use strict';
 
   // ---------- tokenizer ----------
-  const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++'];
-  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not']);
+  const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++', '->'];
+  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern']);
 
   function tokenize(src) {
     const t = [];
@@ -65,7 +65,8 @@
 
     function statement() {
       if (isKw('sovereign')) return funcDecl();
-      if (isKw('let')) { next(); const name = next().value; eatOp('='); return { type: 'Let', name, expr: expression() }; }
+      if (isKw('extern')) return externDecl();
+      if (isKw('let')) { next(); const name = next().value; let typeName = null; if (isOp(':')) { next(); typeName = next().value; } eatOp('='); return { type: 'Let', name, expr: expression(), typeName }; }
       if (isKw('when')) return ifStmt();
       if (isKw('loop')) { next(); const cond = expression(); return { type: 'While', cond, body: block() }; }
       if (isKw('signal')) { next(); return { type: 'Return', expr: expression() }; }
@@ -80,9 +81,17 @@
       }
       return { type: 'ExprStmt', expr: expression() };
     }
-    function funcDecl() { next(); const name = next().value; eat('(');
-      const params = []; while (!isP(')')) { params.push(next().value); if (isOp(',')) next(); }
-      eat(')'); return { type: 'FuncDecl', name, params, body: block() };
+    function paramList() { const params = [], paramTypes = []; eat('(');
+      while (!isP(')')) { const pn = next().value; let pt = null; if (isOp(':')) { next(); pt = next().value; } params.push(pn); paramTypes.push(pt); if (isOp(',')) next(); }
+      eat(')'); return { params, paramTypes };
+    }
+    function funcDecl() { next(); const name = next().value; const { params, paramTypes } = paramList();
+      let returnType = null; if (isOp('->')) { next(); returnType = next().value; }
+      return { type: 'FuncDecl', name, params, paramTypes, returnType, body: block() };
+    }
+    function externDecl() { next(); const name = next().value; const { params, paramTypes } = paramList();
+      let returnType = null; if (isOp('->')) { next(); returnType = next().value; }
+      return { type: 'Extern', name, params, paramTypes, returnType };
     }
     function ifStmt() { next(); const cond = expression(); const body = block();
       let alt = null; if (isKw('dream')) { next(); alt = block(); } return { type: 'If', cond, body, alt };
@@ -210,6 +219,7 @@
     function execStmt(s) {
       switch (s.type) {
         case 'FuncDecl': env.funcs[s.name] = { params: s.params, body: s.body }; return undefined;
+        case 'Extern': return undefined;
         case 'Let': case 'Assign': env.vars[s.name] = evalExpr(s.expr); return undefined;
         case 'ExprStmt': return evalExpr(s.expr);
         case 'If': if (truthy(evalExpr(s.cond))) return execBlockValue(s.body); else if (s.alt) return execBlockValue(s.alt); return undefined;

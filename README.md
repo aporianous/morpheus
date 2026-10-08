@@ -48,6 +48,25 @@ Games compile too — the native runtime provides the screen, clock and keyboard
 node morph.js build examples/snake.morph     # → snake.exe, plays natively (WASD, G, Q)
 ```
 
+## Types & C FFI
+Annotate a function and the native backend emits **real C++ types** — unannotated
+code stays dynamic. Bind a C function with `extern` and link it with `-l`:
+
+```
+extern sqrt(x: float) -> float            # a C function (link with -l m)
+sovereign fib(n: int) -> int { ... }      # typed → long long fib(long long)
+```
+
+```
+node morph.js build examples/typed.morph        # static types (fib, strings)
+node morph.js build examples/ffi.morph -l m     # call the C math library
+```
+
+Type map: `int` → `long long`, `float` → `double`, `str` → `std::string`,
+`bool` → `bool`. Scalar values are stack values — **no heap, no GC** in typed
+code; strings are owned. Explicit ownership/arena and a full C ABI are the next
+step.
+
 ## Build apps
 Morpheus is enough to write real programs: `import` modules, file I/O
 (`read_file` / `write_file`), `argv`, and — for games — a host-driven frame

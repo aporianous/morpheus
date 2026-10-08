@@ -21,11 +21,17 @@ if (cmd === 'build') {
   const cppPath = abs.replace(/\.morph$/i, '') + '.cpp';
   try { fs.writeFileSync(cppPath, compileToCpp(abs)); }
   catch (e) { process.stderr.write('compile error: ' + (e && e.message || e) + '\n'); process.exit(1); }
-  const outExe = rest[0] ? path.resolve(rest[0]) : abs.replace(/\.morph$/i, '') + '.exe';
+  let outExe = null; const link = [];
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === '-o' && rest[i + 1]) outExe = path.resolve(rest[++i]);
+    else if (rest[i] === '-l' && rest[i + 1]) link.push('-l' + rest[++i]);
+    else if (/^-l./.test(rest[i])) link.push(rest[i]);
+  }
+  if (!outExe) outExe = abs.replace(/\.morph$/i, '') + '.exe';
   const env = Object.assign({}, process.env);
   env.PATH = 'C:\\Perseus\\tools\\mingw64\\bin;' + (env.PATH || '');
   process.stdout.write('C++: ' + cppPath + '\n');
-  const r = cp.spawnSync('g++', ['-std=c++17', '-O2', '-static', cppPath, '-o', outExe], { stdio: 'inherit', env });
+  const r = cp.spawnSync('g++', ['-std=c++17', '-O2', '-static', cppPath, '-o', outExe].concat(link), { stdio: 'inherit', env });
   if (r.error) { process.stderr.write('could not run g++: ' + r.error.message + '\n'); process.exit(1); }
   if (r.status !== 0) { process.stderr.write('build failed\n'); process.exit(1); }
   process.stdout.write('Built ' + outExe + '\n');

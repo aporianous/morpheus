@@ -1,0 +1,10 @@
+whisper ffi — call C functions directly (bind the C library).
+whisper build: node morph.js build examples/ffi.morph -l m
+
+extern sqrt(x: float) -> float
+extern strlen(s: str) -> int
+
+sovereign main() {
+    print(sqrt(2.0))
+    print(strlen("morpheus"))
+}
