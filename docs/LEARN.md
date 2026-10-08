@@ -23,17 +23,24 @@ sessions.
 
 ## The units
 
-1. **Values** — numbers, strings, `type`, operator precedence (`+` vs `*`)
-2. **Conditionals** — `when` / `dream`, truthiness
+Each unit teaches **one idea** (a short lesson screen), then quizzes it across
+four tiers — **Easy → Medium → Hard → Expert** — so nothing is dumped on you at
+once. It is fully **self-paced** (no timers); finish a unit to unlock the next.
+
+1. **Values** — numbers, strings, `type`, precedence (`+` vs `*`, `/`, `%`)
+2. **Conditionals** — `when` / `dream` / `dream when`
 3. **Loops** — `loop`, `for x in`, `break` / `continue`
-4. **Collections** — lists (`push`, `len`, `sort`) and maps (`keys`, `has`)
-5. **Functions** — `sovereign`, `signal`, closures (`fn`) with their own state
-6. **Structs** — `struct`, construction, fields, reference semantics
-7. **Build an App** — the capstone: the course unlocks a build workspace
+4. **Collections** — lists and maps; why map keys must be quoted
+5. **Text & Builtins** — `upper`, `split`, `join`, `replace`, `str`, `int`
+6. **Functions** — `sovereign`, `signal`, parameters, recursion
+7. **Closures** — `fn`, capture-by-value, private mutable state
+8. **Structs** — `struct`, fields, nesting, reference semantics
+9. **Errors & Modules** — `heal` / `dream`, `import`, safe `get`
+10. **Build an App** — the capstone: the course unlocks a build workspace
 
 ## The capstone loop (build → check → compile)
 
-Finishing Unit 7 opens a workspace that writes you a starter **`learn/learner.morph`**.
+Finishing Unit 10 opens a workspace that writes you a starter **`learn/learner.morph`**.
 Then you:
 
 1. **Edit** `learn/learner.morph` — make `to_celsius` actually convert Fahrenheit.

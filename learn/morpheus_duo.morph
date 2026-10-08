@@ -1,53 +1,97 @@
 whisper ============================================================
 whisper  MORPHEUS DUO — a Duolingo-style course, written IN Morpheus.
+whisper  Self-paced: one idea per unit, teach first, then questions that
+whisper  climb Easy -> Medium -> Hard -> Expert. Finish a unit to unlock the next.
 whisper  Run:  node morph.js play learn/morpheus_duo.morph
 whisper  Keys: W/S move · ENTER select · 1-3 answer · H help · Q quit · R reset
 whisper ============================================================
 
-# ---- course content: units -> exercises ----------------------------------
+# points awarded per tier
+sovereign tier_points(t) {
+    when t == "Expert" { signal 20 }
+    when t == "Hard" { signal 15 }
+    signal 10
+}
+
+# ---- course content: units -> (teach, exercises with tiers) --------------
 let units = [
-    { "name": "Unit 1 - Values", "ex": [
-        { "q": "What does this print?", "code": "print(2 + 3 * 4)", "opts": ["14", "20", "24"], "ans": 1,
-          "why": "Multiplication binds tighter than +, so 3*4=12, then 2+12=14." },
-        { "q": "What is the type of \"hi\"?", "code": "print(type(\"hi\"))", "opts": ["string", "text", "char"], "ans": 1,
-          "why": "Morpheus reports text as `string`." },
-        { "q": "What does this print?", "code": "print(10 / 4)", "opts": ["2", "2.5", "2.500001"], "ans": 2,
-          "why": "`/` is true division, so 10/4 = 2.5." }
-    ] },
-    { "name": "Unit 2 - Conditionals", "ex": [
-        { "q": "What does this print?", "code": "let x = 7\nwhen x > 5 { print(\"big\") } dream { print(\"small\") }",
-          "opts": ["big", "small", "error"], "ans": 1, "why": "7 > 5 is true, so the `when` branch runs." },
-        { "q": "Which word is Morpheus's `else`?", "code": "when a { }  ???  { }", "opts": ["else", "dream", "other"],
-          "ans": 2, "why": "Morpheus uses `dream` for else, and `dream when` for else-if." }
-    ] },
-    { "name": "Unit 3 - Loops", "ex": [
-        { "q": "How many times does the body run?", "code": "let i = 0\nloop i < 3 { let i = i + 1 }",
-          "opts": ["2", "3", "forever"], "ans": 2, "why": "i goes 0 -> 1 -> 2 -> 3, so the body runs 3 times." },
-        { "q": "What does this print?", "code": "for n in [1, 2, 3] { print(n) }", "opts": ["1 2 3", "0 1 2", "3"],
-          "ans": 1, "why": "`for x in list` visits each element in order." }
-    ] },
-    { "name": "Unit 4 - Collections", "ex": [
-        { "q": "What does this print?", "code": "let l = [1, 2, 3]\npush(l, 4)\nprint(len(l))", "opts": ["3", "4", "5"],
-          "ans": 2, "why": "push appends one element, so the length becomes 4." },
-        { "q": "What does this print?", "code": "let m = {\"a\": 1, \"b\": 2}\nprint(m.keys())", "opts": ["[a, b]", "[1, 2]", "{a, b}"],
-          "ans": 1, "why": "keys() returns the keys, sorted, as a list." }
-    ] },
-    { "name": "Unit 5 - Functions", "ex": [
-        { "q": "What does this print?", "code": "sovereign sq(x) { signal x * x }\nprint(sq(6))", "opts": ["12", "36", "error"],
-          "ans": 2, "why": "`signal` returns a value; sq(6) = 36." },
-        { "q": "Closures keep their own state. What prints?", "code": "let c = 0\nlet inc = fn() { let c = c + 1 signal c }\nprint(inc())\nprint(inc())",
-          "opts": ["1 then 2", "1 then 1", "0 then 1"], "ans": 1, "why": "The closure remembers its own mutable `c` across calls." }
-    ] },
-    { "name": "Unit 6 - Structs", "ex": [
-        { "q": "What does this print?", "code": "struct P { x, y }\nlet p = P(2, 9)\nprint(p.y)", "opts": ["2", "9", "(2, 9)"],
-          "ans": 2, "why": "p.y reads field y, which is 9." },
-        { "q": "Structs are reference-like. What prints?", "code": "struct P { x }\nlet a = P(1)\nlet b = a\nb.x = 5\nprint(a.x)",
-          "opts": ["1", "5", "error"], "ans": 2, "why": "a and b name the SAME instance, so a.x is 5." }
-    ] },
-    { "name": "Unit 7 - Build an App", "ex": [
-        { "q": "Capstone! To store data between runs you use which builtin?", "code": "????(\"notes.txt\", text)",
-          "opts": ["print", "write_file", "push"], "ans": 2, "why": "write_file saves text to disk - real persistence." }
-    ] }
+    { "name": "Unit 1 - Values",
+      "teach": "A value is a number or text (a string).\n+ adds, - subtracts, * multiplies, / divides.\n* binds tighter than +.\n\ntype(3) is number   ·   type(\"hi\") is string",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "print(2 + 3 * 4)", "opts": ["14", "20", "24"], "ans": 1, "why": "3*4=12 first, then 2+12=14." },
+        { "tier": "Medium", "q": "What does this print?", "code": "print(10 / 4)", "opts": ["2", "2.5", "3"], "ans": 2, "why": "/ is true division, so 10/4 = 2.5." },
+        { "tier": "Hard",   "q": "What does this print?", "code": "print(7 % 3)", "opts": ["2", "1", "2.33"], "ans": 2, "why": "% is the remainder: 7 = 2*3 + 1, so 1." },
+        { "tier": "Expert", "q": "What does this print?", "code": "print(type(2.5))", "opts": ["number", "float", "int"], "ans": 1, "why": "Morpheus has one number type; type reports `number`." }
+      ] },
+    { "name": "Unit 2 - Conditionals",
+      "teach": "when runs its block if the condition is true.\ndream is else.   dream when is else-if.\n\nwhen x > 5 { print(\"big\") } dream { print(\"small\") }",
+      "ex": [
+        { "tier": "Easy",   "q": "With x = 7, what prints?", "code": "when x > 5 { print(\"big\") } dream { print(\"small\") }", "opts": ["big", "small", "nothing"], "ans": 1, "why": "7 > 5 is true, so the `when` branch runs." },
+        { "tier": "Medium", "q": "Which word is Morpheus's `else`?", "code": "when a { }  ???  { }", "opts": ["else", "dream", "otherwise"], "ans": 2, "why": "`dream` is else; `dream when` is else-if." },
+        { "tier": "Hard",   "q": "With x = 5, what prints?", "code": "when x > 5 { print(\"big\") } dream { print(\"small\") }", "opts": ["big", "small", "error"], "ans": 2, "why": "5 > 5 is FALSE, so the dream branch runs." },
+        { "tier": "Expert", "q": "With n = 0, what prints?", "code": "when n > 0 { print(\"pos\") } dream when n < 0 { print(\"neg\") } dream { print(\"zero\") }", "opts": ["pos", "neg", "zero"], "ans": 3, "why": "Neither >0 nor <0, so the final dream runs." }
+      ] },
+    { "name": "Unit 3 - Loops",
+      "teach": "loop repeats while a condition stays true.\nfor x in list visits each item in order.\nbreak stops early.   continue skips to the next item.",
+      "ex": [
+        { "tier": "Easy",   "q": "How many times does the body run?", "code": "let i = 0\nloop i < 3 { let i = i + 1 }", "opts": ["2", "3", "forever"], "ans": 2, "why": "i goes 0 -> 1 -> 2 -> 3, so 3 times." },
+        { "tier": "Medium", "q": "What does this print?", "code": "for n in [1, 2, 3] { print(n) }", "opts": ["1 2 3", "0 1 2", "3"], "ans": 1, "why": "`for x in list` visits each element." },
+        { "tier": "Hard",   "q": "What does this print?", "code": "let i = 0\nloop i < 5 { when i == 2 { break } print(i) let i = i + 1 }", "opts": ["0 1", "0 1 2", "0 1 2 3 4"], "ans": 1, "why": "`break` stops the loop when i reaches 2, so only 0 and 1." },
+        { "tier": "Expert", "q": "What does this print?", "code": "let s = 0\nfor n in [1, 2, 3, 4] { let s = s + n }\nprint(s)", "opts": ["4", "10", "24"], "ans": 2, "why": "1+2+3+4 = 10." }
+      ] },
+    { "name": "Unit 4 - Collections",
+      "teach": "A list holds many values: [1, 2, 3].\nA map holds key -> value: {\"a\": 1}  (keys MUST be quoted).\npush adds, len counts, sort orders, keys() lists the keys.",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "let l = [1, 2, 3]\npush(l, 4)\nprint(len(l))", "opts": ["3", "4", "5"], "ans": 2, "why": "push appends one element, so the length is 4." },
+        { "tier": "Medium", "q": "What does this print?", "code": "let m = {\"b\": 1, \"a\": 2}\nprint(m.keys())", "opts": ["[a, b]", "[b, a]", "[1, 2]"], "ans": 1, "why": "keys() returns the keys in sorted order." },
+        { "tier": "Hard",   "q": "Why must map keys be quoted?", "code": "let m = { a: 1 }   whisper this FAILS", "opts": ["it doesn't matter", "a bare word is read as a variable", "keys are optional"], "ans": 2, "why": "In a map literal a bare key is parsed as a variable name, so it must be \"a\"." },
+        { "tier": "Expert", "q": "What does this print?", "code": "let m = {\"a\": 1}\nprint(m.get(\"z\", 0))", "opts": ["error", "0", "null"], "ans": 2, "why": "get(key, default) returns the default when the key is absent — no crash." }
+      ] },
+    { "name": "Unit 5 - Text & Builtins",
+      "teach": "Strings have builtins: upper, lower, trim, split, join, contains, replace.\nstr(x) makes text.   int(s) parses a number.\nsplit(\"a,b\", \",\") -> [\"a\", \"b\"]",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "print(upper(\"ab\"))", "opts": ["AB", "ab", "error"], "ans": 1, "why": "upper() uppercases the string." },
+        { "tier": "Medium", "q": "What does this print?", "code": "print(split(\"a,b\", \",\"))", "opts": ["[a, b]", "a,b", "[\"a,b\"]"], "ans": 1, "why": "split returns a list of the parts." },
+        { "tier": "Hard",   "q": "What does this print?", "code": "print(join([\"a\", \"b\"], \"-\"))", "opts": ["a-b", "[a, b]", "ab"], "ans": 1, "why": "join glues the list with the separator." },
+        { "tier": "Expert", "q": "What does this print?", "code": "print(replace(\"aaa\", \"a\", \"b\"))", "opts": ["bba", "b", "bbb"], "ans": 3, "why": "replace swaps every occurrence: aaa -> bbb." }
+      ] },
+    { "name": "Unit 6 - Functions",
+      "teach": "sovereign defines a function.\nsignal returns a value.\nParameters are local to the call.\n\nsovereign sq(x) { signal x * x }",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "sovereign sq(x) { signal x * x }\nprint(sq(6))", "opts": ["12", "36", "error"], "ans": 2, "why": "signal returns x*x, so sq(6)=36." },
+        { "tier": "Medium", "q": "Which keyword RETURNS a value?", "code": "sovereign f() { ??? 1 }", "opts": ["return", "signal", "yield"], "ans": 2, "why": "Morpheus uses `signal` to return." },
+        { "tier": "Hard",   "q": "What does this print?", "code": "sovereign add(a, b) { signal a + b }\nprint(add(3, 4))", "opts": ["7", "34", "error"], "ans": 1, "why": "Two arguments; 3 + 4 = 7." },
+        { "tier": "Expert", "q": "What does this print?", "code": "sovereign fib(n) { when n < 2 { signal n } signal fib(n-1) + fib(n-2) }\nprint(fib(6))", "opts": ["6", "8", "13"], "ans": 2, "why": "Recursion works: fib(6) = 8." }
+      ] },
+    { "name": "Unit 7 - Closures",
+      "teach": "fn(...) makes a function value you can pass around.\nA closure keeps its OWN mutable state across calls.\nCapture is BY VALUE (a snapshot at creation).",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "let dbl = fn(x) { signal x * 2 }\nprint(dbl(21))", "opts": ["42", "21", "error"], "ans": 1, "why": "dbl doubles its argument." },
+        { "tier": "Medium", "q": "What does this print?", "code": "let dbl = fn(x) { signal x * 2 }\nprint(type(dbl))", "opts": ["fn", "function", "lambda"], "ans": 2, "why": "type of a function value is `function`." },
+        { "tier": "Hard",   "q": "What does this print?", "code": "let c = 0\nlet inc = fn() { let c = c + 1 signal c }\nprint(inc())\nprint(inc())", "opts": ["1 then 2", "1 then 1", "0 then 1"], "ans": 1, "why": "The closure remembers its own mutable c." },
+        { "tier": "Expert", "q": "What does this print?", "code": "let base = 5\nlet addb = fn(x) { signal x + base }\nlet base = 100\nprint(addb(1))", "opts": ["6", "101", "error"], "ans": 1, "why": "Capture is BY VALUE: addb kept base=5, so 1+5=6." }
+      ] },
+    { "name": "Unit 8 - Structs",
+      "teach": "struct makes your own type.\nstruct P { x, y }   then   let p = P(2, 9).\nRead a field with p.x.   Structs are reference-like.",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "struct P { x, y }\nlet p = P(2, 9)\nprint(p.y)", "opts": ["2", "9", "(2, 9)"], "ans": 2, "why": "p.y reads field y, which is 9." },
+        { "tier": "Medium", "q": "What does this print?", "code": "struct P { x }\nlet p = P(1)\np.x = 7\nprint(p.x)", "opts": ["1", "7", "error"], "ans": 2, "why": "You can assign to a field: p.x = 7." },
+        { "tier": "Hard",   "q": "What does this print?", "code": "struct P { x, y }\nstruct L { a, b }\nlet l = L(P(1, 2), P(3, 4))\nprint(l.b.y)", "opts": ["2", "4", "error"], "ans": 2, "why": "Structs nest: l.b.y is 4." },
+        { "tier": "Expert", "q": "What does this print?", "code": "struct P { x }\nlet a = P(1)\nlet b = a\nb.x = 5\nprint(a.x)", "opts": ["1", "5", "error"], "ans": 2, "why": "a and b name the SAME instance, so a.x is 5." }
+      ] },
+    { "name": "Unit 9 - Errors & Modules",
+      "teach": "heal { risky } dream { recover } catches an error.\nimport \"lib.morph\" pulls in another file's functions.\nA missing map key raises an error — use get(m, k, default) to be safe.",
+      "ex": [
+        { "tier": "Easy",   "q": "What does this print?", "code": "heal { print(1 / 0) } dream { print(\"caught\") }", "opts": ["0", "caught", "error"], "ans": 2, "why": "dividing by zero raises; `dream` catches it." },
+        { "tier": "Medium", "q": "Which block RECOVERS from an error?", "code": "heal { ... } ???  { ... }", "opts": ["dream", "catch", "else"], "ans": 1, "why": "heal/dream: heal tries, dream recovers." },
+        { "tier": "Hard",   "q": "What happens here?", "code": "let m = {\"a\": 1}\nprint(m[\"z\"])", "opts": ["prints 0", "raises an error", "prints null"], "ans": 2, "why": "A missing key is an error — use m.get(\"z\", 0) instead." },
+        { "tier": "Expert", "q": "What does import let you do?", "code": "import \"mathlib.morph\"\nprint(square(5))", "opts": ["nothing", "call a function defined in another file", "only import numbers"], "ans": 2, "why": "import runs another file so its functions are available." }
+      ] },
+    { "name": "Unit 10 - Build an App",
+      "teach": "You know the whole language: values, conditions, loops,\ncollections, text, functions, closures, structs, errors, modules.\nNow BUILD: edit code, the course TESTS it, then you compile it.",
+      "ex": [
+        { "tier": "Expert", "q": "Capstone — which builtin saves data to disk between runs?", "code": "????(\"notes.txt\", text)", "opts": ["print", "write_file", "push"], "ans": 2, "why": "write_file persists text — real storage." }
+      ] }
 ]
 
 # ---- progress state ------------------------------------------------------
@@ -59,7 +103,6 @@ let cleared = []
 let i = 0
 loop i < len(units) { let cleared = push(cleared, 0) let i = i + 1 }
 
-# load saved progress if it exists
 let save_str = ""
 heal { save_str = read_file(save_path) } dream { save_str = "" }
 when len(save_str) > 0 {
@@ -112,8 +155,7 @@ sovereign starter_text() {
     let t = t ++ "    whisper TODO: signal (f - 32) * 5 / 9\n"
     let t = t ++ "    signal 0\n"
     let t = t ++ "}\n"
-    let t = t ++ "\n"
-    let t = t ++ "sovereign main() {\n"
+    let t = t ++ "\nsovereign main() {\n"
     let t = t ++ "    print(to_celsius(32))\n"
     let t = t ++ "    print(to_celsius(212))\n"
     let t = t ++ "}\n"
@@ -127,17 +169,19 @@ sovereign write_starter() {
 # ---- drawing -------------------------------------------------------------
 sovereign draw_title() {
     clear()
-    print("+---------------------------------------------+")
-    print("|            M O R P H E U S   D U O           |")
-    print("|        learn to code, one quest at a time     |")
-    print("+---------------------------------------------+")
+    print("+----------------------------------------------+")
+    print("|             M O R P H E U S   D U O           |")
+    print("|     self-paced · teach first · tiered · build  |")
+    print("+----------------------------------------------+")
     print("")
-    print("   Learn Morpheus by playing. Earn XP, keep a streak,")
-    print("   unlock units, and finish by building a real app.")
+    print("   Learn Morpheus one small idea at a time.")
+    print("   Each unit: a quick lesson, then questions from")
+    print("   Easy up to Expert. Earn XP, keep a streak, unlock")
+    print("   units, and finish by building a graded app.")
     print("")
-    print("              PRESS SPACE to begin")
+    print("             PRESS SPACE to begin")
     print("")
-    when xp > 0 { print("   (welcome back - XP " ++ xp ++ ")") }
+    when xp > 0 { print("   welcome back - XP " ++ xp ++ ", best streak " ++ best) }
     print("")
     print("   Q quit")
 }
@@ -161,9 +205,20 @@ sovereign draw_map() {
     print("W/S move    ENTER select    H help    R reset    Q quit")
 }
 
+sovereign draw_teach() {
+    clear()
+    print(units[u]["name"] ++ "   ·   LESSON")
+    print("============================================================")
+    print(units[u]["teach"])
+    print("")
+    print("Next: " ++ str(len(units[u]["ex"])) ++ " questions (Easy -> Expert).")
+    print("")
+    print("ENTER start        M back        Q quit")
+}
+
 sovereign draw_ex() {
     clear()
-    print(units[u]["name"] ++ "    XP " ++ xp ++ "    streak " ++ streak)
+    print(units[u]["name"] ++ "    Q " ++ str(e + 1) ++ "/" ++ str(len(units[u]["ex"])) ++ "    " ++ units[u]["ex"][e]["tier"] ++ "    XP " ++ xp)
     print("------------------------------------------------------------")
     print("Q: " ++ units[u]["ex"][e]["q"])
     print("")
@@ -178,10 +233,10 @@ sovereign draw_ex() {
 
 sovereign draw_fb() {
     clear()
-    print(units[u]["name"] ++ "    XP " ++ xp ++ "    streak " ++ streak)
+    print(units[u]["name"] ++ "    " ++ units[u]["ex"][e]["tier"] ++ "    XP " ++ xp ++ "    streak " ++ streak)
     print("------------------------------------------------------------")
     when fbok {
-        print("  CORRECT!   +10 XP")
+        print("  CORRECT!   +" ++ str(tier_points(units[u]["ex"][e]["tier"])) ++ " XP")
     } dream {
         print("  Not quite.  The answer is " ++ str(units[u]["ex"][e]["ans"]) ++ ".")
     }
@@ -193,17 +248,17 @@ sovereign draw_fb() {
 
 sovereign draw_workspace() {
     clear()
-    print("UNIT 7 - BUILD AN APP")
+    print("UNIT 10 - BUILD AN APP")
     print("============================================================")
     print("You graduated! Now build a real app, in three steps:")
     print("")
-    print("  1. EDIT    learn/learner.morph  (already written for you)")
+    print("  1. EDIT     learn/learner.morph  (written for you)")
     print("             make to_celsius actually convert Fahrenheit.")
     print("")
-    print("  2. CHECK   the course grades your code with real tests:")
+    print("  2. CHECK    the course grades your code with real tests:")
     print("             node morph.js run learn/check_capstone.morph")
     print("")
-    print("  3. COMPILE  once it passes, turn it into a native app:")
+    print("  3. COMPILE  once it passes, make a native app:")
     print("             node morph.js build learn/learner.morph")
     print("")
     print("Your learner.morph right now:")
@@ -214,29 +269,31 @@ sovereign draw_workspace() {
     print("C rewrite starter    M back to units    Q quit")
 }
 
-sovereign draw() {
-    when screen == "title" { draw_title() }
-    dream when screen == "map" { draw_map() }
-    dream when screen == "help" { draw_help() }
-    dream when screen == "ex" { draw_ex() }
-    dream when screen == "fb" { draw_fb() }
-    dream when screen == "workspace" { draw_workspace() }
-}
-
 sovereign draw_help() {
     clear()
     print("HOW TO PLAY")
     print("------------------------------------------------------------")
-    print("  W / S      move the cursor between units")
-    print("  ENTER      select the unit under the cursor (or continue)")
+    print("  W / S      move between units")
+    print("  ENTER      select a unit (or continue)")
     print("  1 2 3      choose an answer")
     print("  R          reset all progress")
     print("  Q          quit")
     print("")
-    print("   Finish a unit to unlock the next one. Finish Unit 7")
-    print("   and the build workspace opens.")
+    print("  Each unit teaches ONE idea, then tests it from")
+    print("  Easy to Expert. Finish a unit to unlock the next.")
+    print("  Go at your own pace - there are no timers.")
     print("")
     print("M / ENTER back")
+}
+
+sovereign draw() {
+    when screen == "title" { draw_title() }
+    dream when screen == "map" { draw_map() }
+    dream when screen == "help" { draw_help() }
+    dream when screen == "teach" { draw_teach() }
+    dream when screen == "ex" { draw_ex() }
+    dream when screen == "fb" { draw_fb() }
+    dream when screen == "workspace" { draw_workspace() }
 }
 
 # ---- the frame: called by the host with the latest key ------------------
@@ -260,17 +317,22 @@ sovereign frame(k) {
                 let e = 0
                 let phase = "ex"
                 let msg = ""
-                let screen = "ex"
+                let screen = "teach"
             } dream {
                 let msg = "Locked - clear the earlier units first."
             }
         }
     }
+    dream when screen == "teach" {
+        when (k == "\n") or (k == " ") { let e = 0 let phase = "ex" let screen = "ex" }
+        when k == "m" { let screen = "map" }
+    }
     dream when screen == "ex" {
         when (k == "1") or (k == "2") or (k == "3") {
             let chosen = int(k)
-            when chosen == units[u]["ex"][e]["ans"] {
-                let xp = xp + 10
+            let ex = units[u]["ex"][e]
+            when chosen == ex["ans"] {
+                let xp = xp + tier_points(ex["tier"])
                 let streak = streak + 1
                 when streak > best { let best = streak }
                 let fbok = true
