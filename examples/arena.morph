@@ -1,0 +1,14 @@
+whisper arena — deterministic, scoped memory (a bump-region).
+whisper everything allocated inside `arena { }` is reclaimed at once on exit.
+
+sovereign main() {
+    arena {
+        let i = 0
+        loop i < 2000 {
+            let row = [i, i * 2, i * 3]
+            let i = i + 1
+        }
+        print("live in arena: " ++ arena_bytes() ++ " bytes")
+    }
+    print("after arena: " ++ arena_bytes() ++ " bytes")
+}

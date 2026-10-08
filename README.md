@@ -64,8 +64,26 @@ node morph.js build examples/ffi.morph -l m     # call the C math library
 
 Type map: `int` → `long long`, `float` → `double`, `str` → `std::string`,
 `bool` → `bool`. Scalar values are stack values — **no heap, no GC** in typed
-code; strings are owned. Explicit ownership/arena and a full C ABI are the next
-step.
+code; strings are owned.
+
+## Memory
+`arena { ... }` is a scoped region — everything allocated inside is freed **all
+at once** when the block exits: deterministic, no garbage collector.
+
+```
+arena {
+    let i = 0
+    loop i < 2000 {
+        let row = [i, i * 2, i * 3]
+        let i = i + 1
+    }
+    print(arena_bytes())     # live bytes: 432000
+}
+print(arena_bytes())         # after exit: 0
+```
+
+`arena_bytes()` reports live bytes (the native build tracks them; the reference
+interpreter does not). See `examples/arena.morph`.
 
 ## Build apps
 Morpheus is enough to write real programs: `import` modules, file I/O

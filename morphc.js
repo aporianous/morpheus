@@ -22,13 +22,13 @@ for (const [n, c] of Object.entries({
   random_norm: 'rt_random_norm', random_int: 'rt_random_int',
   push: 'rt_push', pop: 'rt_pop', unshift: 'rt_unshift', set: 'rt_set',
   remove_at: 'rt_remove_at', rand: 'rt_rand', read_file: 'rt_read_file', write_file: 'rt_write_file',
-  clock: 'rt_clock', clear: 'rt_clear', sleep: 'rt_sleep', key: 'rt_key',
+  clock: 'rt_clock', clear: 'rt_clear', sleep: 'rt_sleep', key: 'rt_key', arena_bytes: 'rt_arena_bytes',
 })) BUILTINS[n] = { c, var: false };
 for (const [n, c] of Object.entries({
   print: 'rt_print', echo: 'rt_print', min: 'rt_min', max: 'rt_max', round: 'rt_round',
   morph_rewrite: 'rt_noop', morph_constant: 'rt_noop',
 })) BUILTINS[n] = { c, var: true };
-const BUILTIN_RET = { len: 'int', random_int: 'int', abs: 'float', sqrt: 'float', sin: 'float', cos: 'float', exp: 'float', pow: 'float', round: 'float', min: 'float', max: 'float', random_uniform: 'float', random_norm: 'float' };
+const BUILTIN_RET = { arena_bytes: 'float', len: 'int', random_int: 'int', abs: 'float', sqrt: 'float', sin: 'float', cos: 'float', exp: 'float', pow: 'float', round: 'float', min: 'float', max: 'float', random_uniform: 'float', random_norm: 'float' };
 
 const BINFN = { '+': 'rt_add', '-': 'rt_sub', '*': 'rt_mul', '/': 'rt_div', '%': 'rt_mod', '**': 'rt_pow',
   '++': 'rt_cat', '>': 'rt_gt', '<': 'rt_lt', '>=': 'rt_ge', '<=': 'rt_le', '==': 'rt_eq', '!=': 'rt_ne' };
@@ -58,6 +58,7 @@ function namesStmt(s, acc) {
     case 'Return': namesExpr(s.expr, acc); break;
     case 'Heal': namesIn(s.body, acc); if (s.alt) namesIn(s.alt, acc); break;
     case 'Block': namesIn(s.body, acc); break;
+    case 'Arena': namesIn(s.body, acc); break;
   }
 }
 function namesIn(stmts, acc) { for (const s of stmts) namesStmt(s, acc); }
@@ -68,7 +69,7 @@ function emitExpr(e) {
     case 'Num': return 'Value(' + e.value + ')';
     case 'Str': return 'Value(' + esc(e.value) + ')';
     case 'Bool': return 'Value(' + (e.value ? 'true' : 'false') + ')';
-    case 'List': return 'Value(List{' + e.items.map(emitExpr).join(', ') + '})';
+    case 'List': { const inner = 'List{' + e.items.map(emitExpr).join(', ') + '}'; return (CTX.arena > 0 ? 'rt_arena_list(' + inner + ')' : 'Value(' + inner + ')'); }
     case 'Ident': return 'v_' + e.name;
     case 'Bin': {
       const L = emitExpr(e.l), R = emitExpr(e.r);
@@ -123,6 +124,7 @@ function emitStmt(s) {
     case 'Return': return 'return ' + emitExpr(s.expr) + ';';
     case 'Heal': return emitHeal(s);
     case 'Block': return '{\n' + emitBlock(s.body) + '\n}';
+    case 'Arena': { CTX.arena = (CTX.arena || 0) + 1; const ab = emitBlock(s.body); CTX.arena--; return '{ RtArena _ar;\n' + ab + '\n}'; }
     case 'Noop': return ';';
     case 'FuncDecl': case 'Extern': return '';
     default: throw new Error('native backend: cannot compile statement ' + s.type);
@@ -219,7 +221,7 @@ function emitTStmt(s, env, retT) {
     case 'If': return 'if (' + emitTExpr(s.cond, env) + ') {\n' + emitTBlock(s.body, env, retT) + '\n}' + (s.alt ? ' else {\n' + emitTBlock(s.alt, env, retT) + '\n}' : '');
     case 'While': return '{ long long _g = 0; while (' + emitTExpr(s.cond, env) + ') { if (++_g > 100000000LL) throw RTError("loop limit exceeded");\n' + emitTBlock(s.body, env, retT) + '\n} }';
     case 'Return': return retT === 'void' ? 'return;' : 'return ' + emitTExpr(s.expr, env) + ';';
-    case 'Block': return '{\n' + emitTBlock(s.body, env, retT) + '\n}';
+    case 'Block': case 'Arena': return '{\n' + emitTBlock(s.body, env, retT) + '\n}';
     case 'Noop': return ';';
     default: throw new Error('typed backend: unsupported statement ' + s.type);
   }
@@ -259,7 +261,7 @@ function cWrap(R, call) { if (R === 'void') return '([&](){ ' + call + '; return
 function TValToC(T, code) { return T === 'str' ? code + '.c_str()' : code; }
 
 // ---------- module loading ----------
-const CTX = { externs: new Map(), typed: new Set(), byName: new Map() };
+const CTX = { externs: new Map(), typed: new Set(), byName: new Map(), arena: 0 };
 function loadModule(absPath, seen, out) {
   const ast = parse(fs.readFileSync(absPath, 'utf8'));
   const dir = path.dirname(absPath);

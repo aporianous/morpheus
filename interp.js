@@ -6,7 +6,7 @@
 
   // ---------- tokenizer ----------
   const OPS = ['**', '>=', '<=', '==', '!=', '&&', '||', '++', '->'];
-  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern']);
+  const KW = new Set(['vision','sovereign','when','dream','signal','morph','heal','prophesy','weave','whisper','loop','from','import','with','samples','confidence','on','true','false','let','and','or','not','extern','arena']);
 
   function tokenize(src) {
     const t = [];
@@ -75,6 +75,7 @@
       if (isKw('import')) return importStmt();
       if (isKw('vision')) { next(); next(); return { type: 'Noop' }; }
       if (isKw('morph')) return { type: 'Block', body: block() };
+      if (isKw('arena')) { next(); return { type: 'Arena', body: block() }; }
       // assignment vs bare expression
       if (peek().type === 'ident' && t[p+1] && t[p+1].type === 'op' && t[p+1].value === '=') {
         const name = next().value; eatOp('='); return { type: 'Assign', name, expr: expression() };
@@ -227,6 +228,7 @@
         case 'Return': { const e = {}; e[RET] = true; e.value = evalExpr(s.expr); throw e; }
         case 'Heal': { try { return execBlockValue(s.body); } catch (e) { if (e[RET]) throw e; if (s.alt) return execBlockValue(s.alt); throw e; } }
         case 'Block': return execBlockValue(s.body);
+        case 'Arena': return execBlockValue(s.body);
         case 'Noop': return undefined;
         case 'Import': {
           const resolve = options.resolve || ((p) => p);
@@ -264,6 +266,7 @@
         argv: () => (options.argv || []).slice(),
         env: (k) => (options.env ? options.env(k) : undefined),
         clock: () => Date.now() / 1000,
+        arena_bytes: () => 0,
         push: (l, v) => { l.push(v); return l; },
         pop: (l) => l.pop(),
         unshift: (l, v) => { l.unshift(v); return l; },

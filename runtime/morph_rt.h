@@ -135,6 +135,28 @@ inline Value rt_clock() { using namespace std::chrono; return Value((double)dura
 inline Value rt_read_file(const Value& p) { std::ifstream f(rt_str(p)); if (!f) throw RTError("FileNotFoundError"); std::stringstream ss; ss << f.rdbuf(); return Value(ss.str()); }
 inline Value rt_write_file(const Value& p, const Value& t) { std::ofstream f(rt_str(p)); f << rt_str(t); return Value(0.0); }
 
+// ---- memory: a scoped bump-region (arena). Everything allocated inside
+//      `arena { ... }` is reclaimed at once when the block exits. ----
+struct RtArenaStore { std::vector<std::shared_ptr<List>> lists; };
+inline std::vector<RtArenaStore*>& rt_arena_stack() { static std::vector<RtArenaStore*> s; return s; }
+struct RtArena {
+  RtArenaStore store;
+  RtArena() { rt_arena_stack().push_back(&store); }
+  ~RtArena() { rt_arena_stack().pop_back(); }
+  RtArena(const RtArena&) = delete;
+  RtArena& operator=(const RtArena&) = delete;
+};
+inline Value rt_arena_list(List x) {
+  Value v(std::move(x));
+  if (!rt_arena_stack().empty()) rt_arena_stack().back()->lists.push_back(v.l);
+  return v;
+}
+inline Value rt_arena_bytes() {
+  size_t b = 0;
+  for (auto s : rt_arena_stack()) for (auto& p : s->lists) if (p) b += p->size() * sizeof(Value);
+  return Value((double)b);
+}
+
 // ---- host: screen, clock, keyboard (so apps/games run natively) ----
 inline Value rt_clear() { std::cout << "\x1b[2J\x1b[H" << std::flush; return Value(0.0); }
 inline Value rt_sleep(const Value& ms) { std::this_thread::sleep_for(std::chrono::milliseconds((long long)rt_num(ms))); return Value(0.0); }
