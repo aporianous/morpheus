@@ -2,7 +2,7 @@
 
 Morpheus is open-core: the language, reference interpreter, stdlib and the
 extension API are open. You can add vocabulary, features, backends and
-packages — without touching the proprietary engine.
+packages — without touching the private runtime.
 
 ## 1. Add a builtin (zero edits)
 
@@ -63,5 +63,5 @@ host (or copy the functions into their program).
 Morpheus is intentionally small and sovereign. When extending:
 - prefer a **new keyword** over overloading an existing one;
 - keep values simple (numbers, strings, booleans, lists);
-- never require the closed engine for a core language feature;
+- keep every feature runnable on this interpreter alone;
 - document every new builtin in `docs/API_REFERENCE.md`.

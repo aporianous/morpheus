@@ -1,6 +1,6 @@
 /* Morpheus (teaching subset) — a small interpreter for the learn-Morpheus demo.
    This is a browser/Node reimplementation of the LANGUAGE SURFACE only
-   (the real engine/substrate is not included). Zero dependencies. */
+   Zero dependencies. */
 (function (root) {
   'use strict';
 

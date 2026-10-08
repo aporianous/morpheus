@@ -4,8 +4,8 @@ Morpheus is **open core**. Contributions to the open layer are welcome:
 the language, the reference interpreter, the standard library, the docs, and
 the extension API.
 
-**Not open:** the runtime engine and the wave/substrate core. Do not add engine
-or substrate code here — those live in a separate, private component.
+**Not open:** the production runtime. Do not add runtime-internal code here —
+that lives in a separate, private component.
 
 ## Ways to contribute
 - **A builtin or language feature** — see `docs/EXTENDING.md`.
@@ -15,7 +15,7 @@ or substrate code here — those live in a separate, private component.
 
 ## Ground rules
 1. Keep the language small and sovereign — prefer a new keyword over overloading.
-2. No dependency on the closed engine for any core language feature.
+2. Keep every core language feature runnable on this interpreter alone.
 3. Every new builtin gets a line in `docs/API_REFERENCE.md`.
 4. Match the existing style: small functions, clear names, no dead code.
 
